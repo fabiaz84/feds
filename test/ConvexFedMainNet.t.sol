@@ -111,6 +111,27 @@ contract ConvexFedTest is DSTest {
         assertLe(percentageActuallyWithdrawnCrv * (10_000 - maxLossWithdrawBps) / 10_000, percentageToWithdraw, "Too much crvLP spent");
     }
 
+    function testContractAll_succeed_whenContractedWithinAcceptableSlippage() public {
+        vm.prank(chair);
+        convexFed.expansion(1000_000 ether);
+        uint initialDolaSupply = convexFed.dolaSupply();
+        uint initialDolaTotalSupply = dola.totalSupply();
+        uint initialCrvLpSupply = convexFed.crvLpSupply();
+
+        vm.prank(chair);
+        convexFed.contractAll();
+
+        //Make sure basic accounting of contraction is correct:
+        assertLe(initialDolaTotalSupply-initialDolaSupply, dola.totalSupply());
+
+        //Make sure maxLoss wasn't exceeded
+        assertLe(initialDolaSupply-convexFed.dolaSupply(), initialDolaSupply*10_000/(10_000-maxLossWithdrawBps), "Amount withdrawn exceeds maxloss"); 
+        assertLe(initialDolaTotalSupply-dola.totalSupply(), initialDolaSupply*10_000/(10_000-maxLossWithdrawBps), "Amount withdrawn exceeds maxloss");
+        uint percentageToWithdraw = 10**18;
+        uint percentageActuallyWithdrawnCrv = initialCrvLpSupply * 10**18 / (initialCrvLpSupply - convexFed.crvLpSupply());
+        assertLe(percentageActuallyWithdrawnCrv * (10_000 - maxLossWithdrawBps) / 10_000, percentageToWithdraw, "Too much crvLP spent");
+    }
+
     function testFailContraction_fail_whenContractedOutsideAcceptableSlippage() public {
         uint amount = 1000_000 ether;
 
