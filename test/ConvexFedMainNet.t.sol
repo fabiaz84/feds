@@ -98,7 +98,7 @@ contract ConvexFedTest is DSTest {
         convexFed.contraction(amount);
 
         //Make sure basic accounting of contraction is correct:
-        assertGt(initialCrvLpSupply, convexFed.crvLpSupply());
+        assertGt(initialCrvLpSupply, convexFed.crvLpSupply(), "");
         assertGt(initialDolaSupply, convexFed.dolaSupply());
         assertGt(initialDolaTotalSupply, dola.totalSupply());
         assertEq(initialDolaTotalSupply - dola.totalSupply(), initialDolaSupply - convexFed.dolaSupply());
@@ -109,6 +109,27 @@ contract ConvexFedTest is DSTest {
         uint percentageToWithdraw = initialDolaSupply * 10**18 / amount;
         uint percentageActuallyWithdrawnCrv = initialCrvLpSupply * 10**18 / (initialCrvLpSupply - convexFed.crvLpSupply());
         assertLe(percentageActuallyWithdrawnCrv * (10_000 - maxLossWithdrawBps) / 10_000, percentageToWithdraw, "Too much crvLP spent");
+    }
+
+    function testContraction_succeed_whenContractedWithProfit(uint amount) public {
+        vm.assume(amount < 10_000_000 * 10**18);
+        vm.assume(amount > 10**18);
+        vm.prank(chair);
+        convexFed.expansion(amount);
+        washTrade(50_000_000 ether, 100);
+        uint initialDolaSupply = convexFed.dolaSupply();
+        uint initialDolaTotalSupply = dola.totalSupply();
+        uint initialCrvLpSupply = convexFed.crvLpSupply();
+        uint initialGovDola = dola.balanceOf(gov);
+
+        vm.prank(chair);
+        convexFed.contraction(amount*100/99);
+
+        //Make sure basic accounting of contraction is correct:
+        assertGt(initialCrvLpSupply, convexFed.crvLpSupply(), "Crv LP Supply didn't drop");
+        assertEq(initialDolaSupply-amount, convexFed.dolaSupply(), "Internal Dola Supply didn't drop by test amount");
+        assertEq(initialDolaTotalSupply, dola.totalSupply()+amount, "Total Dola Supply didn't drop by test amount");
+        assertGt(dola.balanceOf(gov), initialGovDola, "Gov dola balance isn't higher");
     }
 
     function testContractAll_succeed_whenContractedWithinAcceptableSlippage() public {
@@ -132,6 +153,26 @@ contract ConvexFedTest is DSTest {
         assertLe(percentageActuallyWithdrawnCrv * (10_000 - maxLossWithdrawBps) / 10_000, percentageToWithdraw, "Too much crvLP spent");
     }
 
+    function testContractAll_succeed_whenContractedWithProfit() public {
+        vm.prank(chair);
+        convexFed.expansion(1000_000 ether);
+        washTrade(10_000_000 ether, 100);
+        uint initialDolaSupply = convexFed.dolaSupply();
+        uint initialDolaTotalSupply = dola.totalSupply();
+        uint initialGovDola = dola.balanceOf(gov);
+        uint initialCrvLpSupply = convexFed.crvLpSupply();
+
+        vm.prank(chair);
+        convexFed.contractAll();
+
+        //Make sure basic accounting of contraction is correct:
+        assertEq(initialDolaTotalSupply-initialDolaSupply, dola.totalSupply(), "Dola supply was not decreased by initialDolaSupply");
+        assertEq(convexFed.dolaSupply(), 0);
+        assertEq(convexFed.crvLpSupply(), 0);
+        assertGt(initialCrvLpSupply, convexFed.crvLpSupply());
+        assertGt(dola.balanceOf(gov), initialGovDola);
+    }
+
     function testFailContraction_fail_whenContractedOutsideAcceptableSlippage() public {
         uint amount = 1000_000 ether;
 
@@ -139,6 +180,16 @@ contract ConvexFedTest is DSTest {
         convexFed.expansion(amount);
         convexFed.setMaxLossWithdrawBps(0);
         convexFed.contraction(amount);
+        vm.stopPrank();
+    }
+
+    function testFailContractAll_fail_whenContractedOutsideAcceptableSlippage() public {
+        uint amount = 1000_000 ether;
+
+        vm.startPrank(chair);
+        convexFed.expansion(amount);
+        convexFed.setMaxLossWithdrawBps(0);
+        convexFed.contractAll();
         vm.stopPrank();
     }
 
@@ -182,16 +233,7 @@ contract ConvexFedTest is DSTest {
         uint initialCrvLpSupply = convexFed.crvLpSupply();
         uint initialGovDola = dola.balanceOf(gov);
         uint input = 10_000_000 ether;
-        vm.startPrank(dolaFaucet);
-        dola.mint(dolaFaucet, input);
-        //Trade back and forth to create a profit
-        dola.approve(address(crvPool), type(uint).max);
-        crv3.approve(address(crvPool), type(uint).max);
-        for(uint i; i < 100; i++){
-            uint received = crvPool.exchange(0, 1, input, 1);
-            input = crvPool.exchange(1,0, received, 1);
-        }
-        vm.stopPrank();
+        washTrade(input, 100);
         vm.prank(chair);
         convexFed.takeProfit(true);
 
@@ -272,6 +314,20 @@ contract ConvexFedTest is DSTest {
         convexFed.setMaxLossTakeProfitBps(1);
 
         assertEq(convexFed.maxLossTakeProfitBps(), initial);
+    }
+
+    function washTrade(uint amount, uint times) public{
+        vm.startPrank(dolaFaucet);
+        dola.mint(dolaFaucet, amount);
+        //Trade back and forth to create a profit
+        dola.approve(address(crvPool), type(uint).max);
+        crv3.approve(address(crvPool), type(uint).max);
+        uint input = amount;
+        for(uint i; i < times; i++){
+            uint received = crvPool.exchange(0, 1, input, 1);
+            input = crvPool.exchange(1,0, received, 1);
+        }
+        vm.stopPrank();
     }
 }
 
