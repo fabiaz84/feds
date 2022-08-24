@@ -63,11 +63,12 @@ contract ConvexFedTest is DSTest {
         vm.label(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B, "cvx");
     }
 
-    function testExpansion_succeed_whenExpandedWithinAcceptableSlippage() public {
+    function testExpansion_succeed_whenExpandedWithinAcceptableSlippage(uint amount) public {
+        vm.assume(amount < 10_000_000 * 10**18);
+        vm.assume(amount > 10**18);
         uint initialDolaSupply = convexFed.dolaSupply();
         uint initialCrvLpSupply = convexFed.crvLpSupply();
         uint initialDolaTotalSupply = dola.totalSupply();
-        uint amount = 10 ether;
 
         vm.prank(chair);
         convexFed.expansion(amount);
@@ -76,6 +77,7 @@ contract ConvexFedTest is DSTest {
         assertEq(initialDolaSupply + amount, convexFed.dolaSupply());
         //TODO: Should have greater precision about the amount of crvLP acquired
         assertGt(convexFed.crvLpSupply(), initialCrvLpSupply);
+        assertGe(convexFed.crvLpSupply()-initialCrvLpSupply, amount * 10**18 / crvPool.get_virtual_price() * (10_000 - maxLossExpansionBps) / 10_000);
     }
 
     function testFailExpansion_fail_whenExpandedOutsideAcceptableSlippage() public {
