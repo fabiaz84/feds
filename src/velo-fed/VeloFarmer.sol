@@ -1,10 +1,10 @@
 pragma solidity ^0.8.13;
 
 import "../interfaces/IERC20.sol";
-import {IRouter} from "../interfaces/IRouter.sol";
-import {IGauge} from "../interfaces/IGauge.sol";
-import {IRewardsDistributor} from "../interfaces/IRewards.sol";
-import {IL2ERC20Bridge} from "../interfaces/IL2ERC20Bridge.sol";
+import {IRouter} from "../interfaces/velo/IRouter.sol";
+import {IGauge} from "../interfaces/velo/IGauge.sol";
+import {IRewardsDistributor} from "../interfaces/velo/IRewards.sol";
+import {IL2ERC20Bridge} from "../interfaces/velo/IL2ERC20Bridge.sol";
 
 contract VeloFarmer {
     address public chair;

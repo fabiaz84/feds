@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import "ds-test/test.sol";
 import "forge-std/Vm.sol";
 import { IERC20 } from "../interfaces/IERC20.sol";
-import { IDola } from "../interfaces/IDola.sol";
+import { IDola } from "../interfaces/velo/IDola.sol";
 import "../velo-fed/VeloFarmer.sol";
 import {OptiFed} from "../velo-fed/OptiFed.sol";
 
