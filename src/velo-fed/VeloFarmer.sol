@@ -10,6 +10,7 @@ contract VeloFarmer {
     address public gov;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
+    uint public maxSlippageBpsLiquidity;
 
     uint public constant DOLA_USDC_CONVERSION_MULTI= 1e12;
     uint public constant PRECISION = 10_000;
@@ -75,9 +76,14 @@ contract VeloFarmer {
         if (msg.sender != chair) revert OnlyChair();
 
         uint halfDolaAmount = dolaAmount / 2;
-        uint minOut = halfDolaAmount * maxSlippageBpsDolaToUsdc / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         uint[] memory amounts = router.swapExactTokensForTokensSimple(halfDolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
-        router.addLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1], 0, 0, address(this), block.timestamp);
+
+        (uint dolaRequired, uint usdcRequired,) = router.quoteAddLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1]);
+        dolaRequired = dolaRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        usdcRequired = usdcRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+
+        router.addLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1], dolaRequired, usdcRequired, address(this), block.timestamp);
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
     }
 
@@ -87,7 +93,11 @@ contract VeloFarmer {
     function deposit(uint dolaAmount, uint usdcAmount) public {
         if (msg.sender != chair) revert OnlyChair();
 
-        router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, 0, 0, address(this), block.timestamp);
+        (uint dolaRequired, uint usdcRequired,) = router.quoteAddLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount);
+        dolaRequired = dolaRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        usdcRequired = usdcRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+
+        router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, dolaRequired, usdcRequired, address(this), block.timestamp);
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
     }
 
@@ -158,7 +168,12 @@ contract VeloFarmer {
 
         uint withdrawAmount = IERC20(address(dolaGauge)).balanceOf(address(this)) * percent / 100;
         dolaGauge.withdraw(withdrawAmount);
-        (, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, withdrawAmount, 0, 0, address(this), block.timestamp);
+
+        (uint dolaRequired, uint usdcRequired) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, withdrawAmount);
+        dolaRequired = dolaRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        usdcRequired = usdcRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+
+        (, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, withdrawAmount, dolaRequired, usdcRequired, address(this), block.timestamp);
         return amountUSDC;
     }
 
@@ -168,7 +183,7 @@ contract VeloFarmer {
     function swapUSDCtoDOLA(uint usdcAmount) public {
         if (msg.sender != chair) revert OnlyChair();
 
-        uint minOut = usdcAmount * maxSlippageBpsUsdcToDola / PRECISION * DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
         router.swapExactTokensForTokensSimple(usdcAmount, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);
     }
 
@@ -178,7 +193,7 @@ contract VeloFarmer {
     function swapDOLAtoUSDC(uint dolaAmount) public {
         if (msg.sender != chair) revert OnlyChair();
         
-        uint minOut = dolaAmount * maxSlippageBpsDolaToUsdc / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         router.swapExactTokensForTokensSimple(dolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
     }
 
@@ -208,6 +223,16 @@ contract VeloFarmer {
         if (msg.sender != gov) revert OnlyGov();
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsUsdcToDola = newMaxSlippageBps;
+    }
+
+    /**
+    @notice Governance only function for setting acceptable slippage when adding or removing liquidty from DOLA/USDC pool
+    @param newMaxSlippageBps The new maximum allowed loss for adding/removing liquidity from DOLA/USDC pool. 1 = 0.01%
+    */
+    function setMaxSlippageLiquidity(uint newMaxSlippageBps) external {
+        if (msg.sender != gov) revert OnlyGov();
+        if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
+        maxSlippageBpsLiquidity = newMaxSlippageBps;
     }
 
     /**

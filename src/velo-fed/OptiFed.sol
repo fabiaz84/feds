@@ -129,7 +129,7 @@ contract OptiFed {
     function swapUSDCtoDOLA(uint usdcAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
-        curvePool.exchange_underlying(2, 0, usdcAmount, usdcAmount * maxSlippageBpsUsdcToDola / PRECISION);
+        curvePool.exchange_underlying(2, 0, usdcAmount, usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION);
     }
 
     /**
@@ -138,7 +138,7 @@ contract OptiFed {
     function swapDOLAtoUSDC(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
-        curvePool.exchange_underlying(0, 2, dolaAmount, dolaAmount * maxSlippageBpsDolaToUsdc / PRECISION);
+        curvePool.exchange_underlying(0, 2, dolaAmount, dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION);
     }
 
     /**

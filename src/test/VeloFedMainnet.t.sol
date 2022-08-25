@@ -48,16 +48,17 @@ contract VeloFedMainnetTest is DSTest {
 
             vm.stopPrank();
             vm.startPrank(l1gov);
-            l1Fed.setMaxSlippageDolaToUsdc(50);
-            l1Fed.setMaxSlippageUsdcToDola(200);
+            l1Fed.setMaxSlippageDolaToUsdc(500);
+            l1Fed.setMaxSlippageUsdcToDola(100);
             L1DOLA.addMinter(address(l1Fed));
         } else {
             l2fed = new VeloFarmer(payable(address(router)), address(L2DOLA), address(USDC), gov, l2optiBridgeAddress, optiFedAddress);
 
             vm.stopPrank();
             vm.startPrank(gov);
-            l2fed.setMaxSlippageDolaToUsdc(50);
-            l2fed.setMaxSlippageUsdcToDola(200);
+            l2fed.setMaxSlippageDolaToUsdc(500);
+            l2fed.setMaxSlippageUsdcToDola(100);
+            // l2fed.setMaxSlippageLiquidity(0);
         }
 
         vm.stopPrank();
