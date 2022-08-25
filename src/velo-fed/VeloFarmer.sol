@@ -3,19 +3,18 @@ pragma solidity ^0.8.13;
 import "../interfaces/IERC20.sol";
 import {IRouter} from "../interfaces/velo/IRouter.sol";
 import {IGauge} from "../interfaces/velo/IGauge.sol";
-import {IRewardsDistributor} from "../interfaces/velo/IRewards.sol";
 import {IL2ERC20Bridge} from "../interfaces/velo/IL2ERC20Bridge.sol";
 
 contract VeloFarmer {
     address public chair;
     address public gov;
-    uint public maxSlippageBps;
+    uint public maxSlippageBpsDolaToUsdc;
+    uint public maxSlippageBpsUsdcToDola;
 
     uint public constant DOLA_USDC_CONVERSION_MULTI= 1e12;
     uint public constant PRECISION = 10_000;
 
     IRouter public immutable router;
-    IRewardsDistributor public immutable rewards;
     IGauge public immutable dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
     IERC20 public immutable DOLA;
     IERC20 public immutable USDC;
@@ -31,7 +30,6 @@ contract VeloFarmer {
     
     constructor(
             address payable routerAddr_, 
-            address rewardsAddr_, 
             address dolaAddr_, 
             address usdcAddr_,
             address gov_,
@@ -40,7 +38,6 @@ contract VeloFarmer {
         )
     {
         router = IRouter(routerAddr_);
-        rewards = IRewardsDistributor(rewardsAddr_);
         DOLA = IERC20(dolaAddr_);
         USDC = IERC20(usdcAddr_);
         chair = msg.sender;
@@ -78,7 +75,7 @@ contract VeloFarmer {
         if (msg.sender != chair) revert OnlyChair();
 
         uint halfDolaAmount = dolaAmount / 2;
-        uint minOut = halfDolaAmount * maxSlippageBps / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = halfDolaAmount * maxSlippageBpsDolaToUsdc / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         uint[] memory amounts = router.swapExactTokensForTokensSimple(halfDolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
         router.addLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1], 0, 0, address(this), block.timestamp);
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
@@ -171,7 +168,7 @@ contract VeloFarmer {
     function swapUSDCtoDOLA(uint usdcAmount) public {
         if (msg.sender != chair) revert OnlyChair();
 
-        uint minOut = usdcAmount * maxSlippageBps / PRECISION * DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = usdcAmount * maxSlippageBpsUsdcToDola / PRECISION * DOLA_USDC_CONVERSION_MULTI;
         router.swapExactTokensForTokensSimple(usdcAmount, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);
     }
 
@@ -181,7 +178,7 @@ contract VeloFarmer {
     function swapDOLAtoUSDC(uint dolaAmount) public {
         if (msg.sender != chair) revert OnlyChair();
         
-        uint minOut = dolaAmount * maxSlippageBps / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = dolaAmount * maxSlippageBpsDolaToUsdc / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         router.swapExactTokensForTokensSimple(dolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
     }
 
@@ -194,13 +191,23 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Governance only function for setting acceptable slippage when swapping tokens
-    @param newMaxSlippageBps The new maximum allowed loss for swaps. 1 = 0.01%
+    @notice Governance only function for setting acceptable slippage when swapping DOLA -> USDC
+    @param newMaxSlippageBps The new maximum allowed loss for DOLA -> USDC swaps. 1 = 0.01%
     */
-    function setMaxSlippage(uint newMaxSlippageBps) external {
+    function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) external {
         if (msg.sender != gov) revert OnlyGov();
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
-        maxSlippageBps = newMaxSlippageBps;
+        maxSlippageBpsDolaToUsdc = newMaxSlippageBps;
+    }
+
+    /**
+    @notice Governance only function for setting acceptable slippage when swapping USDC -> DOLA
+    @param newMaxSlippageBps The new maximum allowed loss for USDC -> DOLA swaps. 1 = 0.01%
+    */
+    function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) external {
+        if (msg.sender != gov) revert OnlyGov();
+        if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
+        maxSlippageBpsUsdcToDola = newMaxSlippageBps;
     }
 
     /**

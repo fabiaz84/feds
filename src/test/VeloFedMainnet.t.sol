@@ -13,7 +13,6 @@ contract VeloFedMainnetTest is DSTest {
 
     //Tokens
     IRouter public router = IRouter(payable(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9));
-    IRewardsDistributor public rewards = IRewardsDistributor(0x5d5Bea9f0Fc13d967511668a60a3369fD53F784F);
     IGauge public dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
     IDola public L2DOLA = IDola(0x8aE125E8653821E851F12A49F7765db9a9ce7384);
     IDola public L1DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
@@ -49,13 +48,16 @@ contract VeloFedMainnetTest is DSTest {
 
             vm.stopPrank();
             vm.startPrank(l1gov);
+            l1Fed.setMaxSlippageDolaToUsdc(50);
+            l1Fed.setMaxSlippageUsdcToDola(200);
             L1DOLA.addMinter(address(l1Fed));
         } else {
-            l2fed = new VeloFarmer(payable(address(router)), address(rewards), address(L2DOLA), address(USDC), gov, l2optiBridgeAddress, optiFedAddress);
+            l2fed = new VeloFarmer(payable(address(router)), address(L2DOLA), address(USDC), gov, l2optiBridgeAddress, optiFedAddress);
 
             vm.stopPrank();
             vm.startPrank(gov);
-            l2fed.setMaxSlippage(200);
+            l2fed.setMaxSlippageDolaToUsdc(50);
+            l2fed.setMaxSlippageUsdcToDola(200);
         }
 
         vm.stopPrank();
@@ -111,11 +113,18 @@ contract VeloFedMainnetTest is DSTest {
         l1Fed.setMaxDailyDelta(1e18);
     }
     
-    function testL1_setMaxSlippage_fail_whenCalledByNonGov() public {
+    function testL1_setMaxSlippageDolaToUsdc_fail_whenCalledByNonGov() public {
         vm.startPrank(user);
 
         vm.expectRevert(OnlyGov.selector);
-        l1Fed.setMaxSlippage(500);
+        l1Fed.setMaxSlippageDolaToUsdc(500);
+    }
+
+    function testL1_setMaxSlippageUsdcToDola_fail_whenCalledByNonGov() public {
+        vm.startPrank(user);
+
+        vm.expectRevert(OnlyGov.selector);
+        l1Fed.setMaxSlippageUsdcToDola(500);
     }
 
     function testL1_resign_fail_whenCalledByNonChair() public {
@@ -243,11 +252,18 @@ contract VeloFedMainnetTest is DSTest {
         l2fed.resign();
     }
 
-    function testL2_setMaxSlippage_fail_whenCalledByNonGov() public {
+    function testL2_setMaxSlippageDolaToUsdc_fail_whenCalledByNonGov() public {
         vm.startPrank(user);
 
         vm.expectRevert(OnlyGov.selector);
-        l2fed.setMaxSlippage(500);
+        l2fed.setMaxSlippageDolaToUsdc(500);
+    }
+
+    function testL2_setMaxSlippageUsdcToDola_fail_whenCalledByNonGov() public {
+        vm.startPrank(user);
+
+        vm.expectRevert(OnlyGov.selector);
+        l2fed.setMaxSlippageUsdcToDola(500);
     }
 
     function testL2_changeGov_fail_whenCalledByNonGov() public {

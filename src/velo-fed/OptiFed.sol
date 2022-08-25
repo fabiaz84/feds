@@ -9,7 +9,8 @@ contract OptiFed {
     address public chair;
     address public gov;
     uint public underlyingSupply;
-    uint public maxSlippageBps;
+    uint public maxSlippageBpsDolaToUsdc;
+    uint public maxSlippageBpsUsdcToDola;
     uint public lastDeltaUpdate;
     uint public maxDailyDelta;
     uint private dailyDelta;
@@ -123,21 +124,21 @@ contract OptiFed {
     }
 
     /**
-    @notice Swap `usdcAmount` of USDC for DOLA through curve. Will revert if actual slippage > `maxSlippageBps`
+    @notice Swap `usdcAmount` of USDC for DOLA through curve. Will revert if actual slippage > `maxSlippageBpsUsdcToDola`
     */
     function swapUSDCtoDOLA(uint usdcAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
-        curvePool.exchange_underlying(2, 0, usdcAmount, usdcAmount * maxSlippageBps / PRECISION);
+        curvePool.exchange_underlying(2, 0, usdcAmount, usdcAmount * maxSlippageBpsUsdcToDola / PRECISION);
     }
 
     /**
-    @notice Swap `dolaAmount` of DOLA for USDC through curve. Will revert if actual slippage > `maxSlippageBps`
+    @notice Swap `dolaAmount` of DOLA for USDC through curve. Will revert if actual slippage > `maxSlippageBpsDolaToUsdc`
     */
     function swapDOLAtoUSDC(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
-        curvePool.exchange_underlying(0, 2, dolaAmount, dolaAmount * maxSlippageBps / PRECISION);
+        curvePool.exchange_underlying(0, 2, dolaAmount, dolaAmount * maxSlippageBpsDolaToUsdc / PRECISION);
     }
 
     /**
@@ -175,13 +176,23 @@ contract OptiFed {
     }
 
     /**
-    @notice Governance only function for setting acceptable slippage when swapping tokens
-    @param newMaxSlippageBps The new maximum allowed loss for swaps. 1 = 0.01%
+    @notice Governance only function for setting acceptable slippage when swapping DOLA -> USDC
+    @param newMaxSlippageBps The new maximum allowed loss for DOLA -> USDC swaps. 1 = 0.01%
     */
-    function setMaxSlippage(uint newMaxSlippageBps) external {
+    function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) external {
         if (msg.sender != gov) revert OnlyGov();
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
-        maxSlippageBps = newMaxSlippageBps;
+        maxSlippageBpsDolaToUsdc = newMaxSlippageBps;
+    }
+
+    /**
+    @notice Governance only function for setting acceptable slippage when swapping USDC -> DOLA
+    @param newMaxSlippageBps The new maximum allowed loss for USDC -> DOLA swaps. 1 = 0.01%
+    */
+    function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) external {
+        if (msg.sender != gov) revert OnlyGov();
+        if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
+        maxSlippageBpsUsdcToDola = newMaxSlippageBps;
     }
 
     /**
