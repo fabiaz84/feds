@@ -28,6 +28,7 @@ contract VeloFarmer {
     error OnlyGov();
     error MaxSlippageTooHigh();
     error NotEnoughTokens();
+    error PercentOutOfRange();
     
     constructor(
             address payable routerAddr_, 
@@ -165,6 +166,7 @@ contract VeloFarmer {
     */
     function withdrawLiquidity(uint percent) public returns (uint) {
         if (msg.sender != chair) revert OnlyChair();
+        if (percent == 0 || percent > 100) revert PercentOutOfRange();
 
         uint withdrawAmount = IERC20(address(dolaGauge)).balanceOf(address(this)) * percent / 100;
         dolaGauge.withdraw(withdrawAmount);

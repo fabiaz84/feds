@@ -3,14 +3,13 @@ pragma solidity ^0.8.13;
 
 import "ds-test/test.sol";
 import "forge-std/Vm.sol";
+import "forge-std/Test.sol";
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { IDola } from "../interfaces/velo/IDola.sol";
 import "../velo-fed/VeloFarmer.sol";
 import {OptiFed} from "../velo-fed/OptiFed.sol";
 
-contract VeloFedMainnetTest is DSTest {
-    Vm internal constant vm = Vm(HEVM_ADDRESS);
-
+contract VeloFedMainnetTest is Test {
     //Tokens
     IRouter public router = IRouter(payable(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9));
     IGauge public dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
@@ -20,6 +19,7 @@ contract VeloFedMainnetTest is DSTest {
     IERC20 public USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
     address public l2optiBridgeAddress = 0x4200000000000000000000000000000000000010;
     address public optiFedAddress = address(13);
+    address public dolaUsdcPoolAddy = 0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d;
 
     address l1optiBridgeAddress = 0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1;
 
@@ -39,6 +39,7 @@ contract VeloFedMainnetTest is DSTest {
 
     error OnlyGov();
     error OnlyChair();
+    error PercentOutOfRange();
     
     function setUp() public {
         vm.startPrank(chair);
@@ -58,7 +59,7 @@ contract VeloFedMainnetTest is DSTest {
             vm.startPrank(gov);
             l2fed.setMaxSlippageDolaToUsdc(500);
             l2fed.setMaxSlippageUsdcToDola(100);
-            // l2fed.setMaxSlippageLiquidity(0);
+            l2fed.setMaxSlippageLiquidity(100);
         }
 
         vm.stopPrank();
@@ -168,16 +169,21 @@ contract VeloFedMainnetTest is DSTest {
     function testL2_SwapAndClaimVeloRewards() public {
         gibDOLA(address(l2fed), dolaAmount * 3);
 
+        uint initialVelo = VELO.balanceOf(address(l2fed));
+
         vm.startPrank(chair);
         l2fed.swapAndDeposit(dolaAmount);
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + (10_000 * 60));
         l2fed.claimVeloRewards();
-        VELO.balanceOf(address(l2fed));
+
+        assertGt(VELO.balanceOf(address(l2fed)), initialVelo, "No rewards claimed");
     }
 
     function testL2_SwapAndClaimRewards() public {
         gibDOLA(address(l2fed), dolaAmount * 3);
+
+        uint initialVelo = VELO.balanceOf(address(l2fed));
 
         vm.startPrank(chair);
         l2fed.swapAndDeposit(dolaAmount);
@@ -186,15 +192,23 @@ contract VeloFedMainnetTest is DSTest {
         address[] memory addr = new address[](1);
         addr[0] = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
         l2fed.claimRewards(addr);
-        VELO.balanceOf(address(l2fed));
+
+        assertGt(VELO.balanceOf(address(l2fed)), initialVelo, "No rewards claimed");
     }
 
-    function testL2_Deposit() public {
-        gibDOLA(address(l2fed), dolaAmount * 3);
-        gibUSDC(address(l2fed), usdcAmount * 3);
+    function testL2_Deposit(uint amountDola, uint amountUsdc) public {
+        amountDola = bound(amountDola, 10e18, 1_000_000_000e18);
+        amountUsdc = bound(amountUsdc, 10e6, 1_000_000_000e6);
+        gibDOLA(address(l2fed), amountDola);
+        gibUSDC(address(l2fed), amountUsdc);
 
         vm.startPrank(chair);
+
+        (,,uint liquidity) = router.quoteAddLiquidity(address(L2DOLA), address(USDC), true, amountDola, amountUsdc);
+
         l2fed.depositAll();
+
+        assertEq(liquidity, dolaGauge.balanceOf(address(l2fed)), "Didn't receive correct amount of LP tokens");
     }
 
     function testL2_Swap() public {
@@ -204,46 +218,60 @@ contract VeloFedMainnetTest is DSTest {
         l2fed.swapAndDeposit(dolaAmount);
     }
 
-    function testL2_WithdrawFiftyPercent() public {
+    function testL2_Withdraw(uint8 percent) public {
+        percent = uint8(bound(percent, uint8(1), uint8(100)));
+
         gibDOLA(address(l2fed), dolaAmount * 3);
 
         vm.startPrank(chair);
         l2fed.swapAndDeposit(dolaAmount);
-        l2fed.withdrawLiquidity(50);
 
-        emit log_named_uint("DOLA bal", L2DOLA.balanceOf(address(l2fed)));
-        emit log_named_uint("USDC bal", USDC.balanceOf(address(l2fed)));
-        emit log_named_uint("LP bal", IERC20(address(dolaGauge)).balanceOf(address(l2fed)));
+        uint initialDola = L2DOLA.balanceOf(address(l2fed));
+        uint initialUsdc = USDC.balanceOf(address(l2fed));
+
+        //calculate expected token out amounts
+        uint liquidity = dolaGauge.balanceOf(address(l2fed)) * percent / 100;
+        (uint dolaOut, uint usdcOut) = router.quoteRemoveLiquidity(address(L2DOLA), address(USDC), true, liquidity);
+
+        l2fed.withdrawLiquidity(percent);
+
+        assertEq(initialDola + dolaOut, L2DOLA.balanceOf(address(l2fed)), "Didn't receive correct amount USDC");
+        assertEq(initialUsdc + usdcOut, USDC.balanceOf(address(l2fed)), "Didn't receive correct amount USDC");
+        
+        l2fed.withdrawToL1OptiFed(L2DOLA.balanceOf(address(l2fed)), USDC.balanceOf(address(l2fed)));
     }
 
-    function testL2_WithdrawAll() public {
+    function testL2_Withdraw_FailsIfPercentOutOfRange(uint8 percent) public {
+        vm.assume(percent < 1 || percent > 100);
+
         gibDOLA(address(l2fed), dolaAmount * 3);
 
         vm.startPrank(chair);
         l2fed.swapAndDeposit(dolaAmount);
-        l2fed.withdrawLiquidity(100);
 
-        emit log_named_uint("DOLA bal", L2DOLA.balanceOf(address(l2fed)));
-        emit log_named_uint("USDC bal", USDC.balanceOf(address(l2fed)));
-        emit log_named_uint("LP bal", IERC20(address(dolaGauge)).balanceOf(address(l2fed)));
-
-        l2fed.withdrawToL1OptiFed(L2DOLA.balanceOf(address(l2fed)));
-        emit log_named_uint("DOLA bal", L2DOLA.balanceOf(address(l2fed)));
+        vm.expectRevert(PercentOutOfRange.selector);
+        l2fed.withdrawLiquidity(percent);
     }
 
-    function testL2_WithdrawAndSwapAll() public {
+    function testL2_WithdrawAndSwap(uint8 percent) public {
+        percent = uint8(bound(percent, uint8(1), uint8(100)));
         gibDOLA(address(l2fed), dolaAmount * 3);
 
         vm.startPrank(chair);
         l2fed.swapAndDeposit(dolaAmount);
-        l2fed.withdrawLiquidityAndSwapToDOLA(100);
 
-        emit log_named_uint("DOLA bal", L2DOLA.balanceOf(address(l2fed)));
-        emit log_named_uint("USDC bal", USDC.balanceOf(address(l2fed)));
-        emit log_named_uint("LP bal", IERC20(address(dolaGauge)).balanceOf(address(l2fed)));
+        uint initialDolaBal = L2DOLA.balanceOf(address(l2fed));
 
-        l2fed.withdrawToL1OptiFed(L2DOLA.balanceOf(address(l2fed)));
-        emit log_named_uint("DOLA bal", L2DOLA.balanceOf(address(l2fed)));
+        //calculate expected token out amounts
+        uint liquidity = dolaGauge.balanceOf(address(l2fed)) * percent / 100;
+        (uint dolaOut, uint usdcOut) = router.quoteRemoveLiquidity(address(L2DOLA), address(USDC), true, liquidity);
+        (uint dolaFromUsdcSwap, ) = router.getAmountOut(usdcOut, address(USDC), address(L2DOLA));
+
+        l2fed.withdrawLiquidityAndSwapToDOLA(percent);
+
+        //assert that values are within .1% of expected to account for liquidity removal
+        assertGt((initialDolaBal + dolaOut + dolaFromUsdcSwap) * 1001 / 1000, L2DOLA.balanceOf(address(l2fed)), "Didn't receive correct amount of DOLA");
+        assertLt((initialDolaBal + dolaOut + dolaFromUsdcSwap), L2DOLA.balanceOf(address(l2fed)) * 1001 / 1000, "Didn't receive correct amount of DOLA");
     }
 
     function testL2_resign_fail_whenCalledByNonChair() public {
@@ -288,7 +316,7 @@ contract VeloFedMainnetTest is DSTest {
         l2fed.changeOptiFed(user);
     }
 
-    //Helper Functions
+    //My loyal helpers
 
     function gibAnTokens(address _user, address _anToken, uint _amount) internal {
         bytes32 slot;
