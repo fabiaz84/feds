@@ -96,11 +96,47 @@ contract VeloFarmerMainnetTest is Test {
         assertEq(liquidity, dolaGauge.balanceOf(address(fed)), "Didn't receive correct amount of LP tokens");
     }
 
-    function testL2_Swap() public {
+    function testL2_SwapAndDeposit_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
         gibDOLA(address(fed), dolaAmount * 3);
 
+        vm.startPrank(gov);
+        fed.setMaxSlippageDolaToUsdc(100);
+        vm.stopPrank();
+
         vm.startPrank(chair);
+        vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
         fed.swapAndDeposit(dolaAmount);
+    }
+
+    function testL2_SwapDolaToUsdc_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
+        gibDOLA(address(fed), dolaAmount * 3);
+
+        vm.startPrank(gov);
+        fed.setMaxSlippageDolaToUsdc(100);
+        vm.stopPrank();
+
+        vm.startPrank(chair);
+        vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
+        fed.swapDOLAtoUSDC(dolaAmount);
+    }
+
+    function testL2_SwapUsdcToDola_Fails_WhenSlippageGtMaxUsdcToDolaSlippage() public {
+        gibUSDC(address(fed), usdcAmount * 3);
+
+        uint usdcToSwap = usdcAmount * 3;
+        gibUSDC(address(user), usdcToSwap);
+        vm.startPrank(user);
+        USDC.approve(address(router), type(uint).max);
+        router.swapExactTokensForTokensSimple(usdcToSwap, 0, address(USDC), address(DOLA), true, address(user), block.timestamp);
+        vm.stopPrank();
+
+        vm.startPrank(gov);
+        fed.setMaxSlippageUsdcToDola(100);
+        vm.stopPrank();
+
+        vm.startPrank(chair);
+        vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
+        fed.swapUSDCtoDOLA(usdcAmount);
     }
 
     function testL2_Withdraw(uint8 percent) public {
