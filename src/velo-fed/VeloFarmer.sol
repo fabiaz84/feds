@@ -145,7 +145,7 @@ contract VeloFarmer {
     */
     function withdrawTokensToL1(address l2Token, address to, uint amount) external {
         if (msg.sender != chair) revert OnlyChair();
-        if (amount < IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
+        if (amount > IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
 
         IERC20(l2Token).approve(address(bridge), amount);
         bridge.withdrawTo(address(l2Token), to, amount, 0, "");
@@ -156,7 +156,7 @@ contract VeloFarmer {
     */
     function transferTokens(address token, address to, uint amount) external {
         if (msg.sender != gov) revert OnlyGov();
-        if (amount < IERC20(token).balanceOf(address(this))) revert NotEnoughTokens();
+        if (amount > IERC20(token).balanceOf(address(this))) revert NotEnoughTokens();
 
         require(IERC20(token).transfer(to, amount), "Token transfer failed");
     }
