@@ -243,22 +243,10 @@ contract ConvexFedTest is DSTest {
         assertGt(initialCrvLpSupply, convexFed.crvLpSupply());
     }
 
-    function testExpansion_FailWithOnlyChair_whenCalledByOtherAddress() public {
-        vm.prank(dolaFaucet);
-        vm.expectRevert("ONLY CHAIR");
-        convexFed.expansion(1000);
-    }
-
     function testContraction_FailWithOnlyChair_whenCalledByOtherAddress() public {
         vm.prank(dolaFaucet);
         vm.expectRevert("ONLY CHAIR");
         convexFed.contraction(1000);
-    }
-
-    function testTakeProfit_FailWithOnlyChair_whenCalledByOtherAddress() public {
-        vm.prank(dolaFaucet);
-        vm.expectRevert("ONLY CHAIR");
-        convexFed.takeProfit(true);
     }
 
     function testSetMaxLossExpansionBps_succeed_whenCalledByGov() public {
@@ -316,6 +304,16 @@ contract ConvexFedTest is DSTest {
         convexFed.setMaxLossTakeProfitBps(1);
 
         assertEq(convexFed.maxLossTakeProfitBps(), initial);
+    }
+
+    function testTakeProfit_FailWithOnlyChair_whenCalledByOtherAddress() public {
+        vm.prank(chair);
+        convexFed.expansion(1000_000 ether);
+        washTrade(1000_000 ether, 100);
+ 
+        vm.prank(dolaFaucet);
+        vm.expectRevert("ONLY CHAIR CAN TAKE CRV LP PROFIT");
+        convexFed.takeProfit(true);
     }
 
     function washTrade(uint amount, uint times) public{

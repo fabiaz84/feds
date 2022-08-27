@@ -8,15 +8,14 @@ import "src/convex-fed/CurvePoolAdapter.sol";
 
 contract ConvexFed is CurvePoolAdapter{
 
-    uint public immutable CONVEX_PID;
-    IConvexBooster public convexBooster;
-    IConvexBaseRewardPool public convexBaseRewardPool;
+    uint public immutable poolId;
+    IConvexBooster public booster;
+    IConvexBaseRewardPool public baseRewardPool;
     IERC20 public crv;
     IERC20 public CVX;
     address public chair; // Fed Chair
     address public gov;
     uint public dolaSupply;
-    uint public crvLpSupply;
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
@@ -30,22 +29,22 @@ contract ConvexFed is CurvePoolAdapter{
             address CVX_,
             address crvPoolAddr,
             address zapDepositor,
-            address convexBooster_, 
-            address convexBaseRewardPool_, 
+            address booster_, 
+            address baseRewardPool_, 
             address gov_, 
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
             uint maxLossTakeProfitBps_,
-            uint CONVEX_PID_) 
+            uint poolId_) 
             CurvePoolAdapter(dola_, crvPoolAddr, zapDepositor, 10**18)
     {
-        convexBooster = IConvexBooster(convexBooster_);
-        convexBaseRewardPool = IConvexBaseRewardPool(convexBaseRewardPool_);
+        booster = IConvexBooster(booster_);
+        baseRewardPool = IConvexBaseRewardPool(baseRewardPool_);
         crv = IERC20(crv_);
         CVX = IERC20(CVX_);
-        CONVEX_PID = CONVEX_PID_;
-        IERC20(crvPoolAddr).approve(convexBooster_, type(uint256).max);
-        IERC20(crvPoolAddr).approve(convexBaseRewardPool_, type(uint256).max);
+        poolId = poolId_;
+        IERC20(crvPoolAddr).approve(booster_, type(uint256).max);
+        IERC20(crvPoolAddr).approve(baseRewardPool_, type(uint256).max);
         chair = msg.sender;
         maxLossExpansionBps = maxLossExpansionBps_;
         maxLossWithdrawBps = maxLossWithdrawBps_;
@@ -103,8 +102,8 @@ contract ConvexFed is CurvePoolAdapter{
         require(msg.sender == chair, "ONLY CHAIR");
         dolaSupply += amount;
         dola.mint(address(this), amount);
-        crvLpSupply += metapoolDeposit(amount, maxLossExpansionBps);
-        require(convexBooster.depositAll(CONVEX_PID, true), 'Failed Deposit');
+        metapoolDeposit(amount, maxLossExpansionBps);
+        require(booster.depositAll(poolId, true), 'Failed Deposit');
         emit Expansion(amount);
     }
 
@@ -125,10 +124,10 @@ contract ConvexFed is CurvePoolAdapter{
         require(msg.sender == chair, "ONLY CHAIR");
         //Calculate how many lp tokens are needed to withdraw the dola
         uint crvLpNeeded = lpForDola(amountDola);
-        require(crvLpNeeded <= crvLpSupply, "Not enough crvLP tokens");
+        require(crvLpNeeded <= crvLpSupply(), "Not enough crvLP tokens");
 
         //Withdraw and unwrap curveLP tokens from convex, but don't claim rewards
-        require(convexBaseRewardPool.withdrawAndUnwrap(crvLpNeeded, false), "CONVEX WITHDRAW FAILED");
+        require(baseRewardPool.withdrawAndUnwrap(crvLpNeeded, false), "CONVEX WITHDRAW FAILED");
 
         //Withdraw DOLA from curve pool
         uint dolaWithdrawn = metapoolWithdraw(amountDola, maxLossWithdrawBps);
@@ -141,7 +140,6 @@ contract ConvexFed is CurvePoolAdapter{
             dola.burn(dolaWithdrawn);
             dolaSupply = dolaSupply - dolaWithdrawn;
         }
-        crvLpSupply -= crvLpNeeded;
         emit Contraction(dolaWithdrawn);
     }
 
@@ -151,9 +149,9 @@ contract ConvexFed is CurvePoolAdapter{
     */
     function contractAll() public {
         require(msg.sender == chair, "ONLY CHAIR");
-        require(convexBaseRewardPool.withdrawAndUnwrap(crvLpSupply, false), "CONVEX WITHDRAW FAILED");
+        baseRewardPool.withdrawAllAndUnwrap(false);
         uint dolaMinOut = dolaSupply * (10_000 - maxLossWithdrawBps) / 10_000;
-        uint dolaOut = zapDepositor.remove_liquidity_one_coin(crvMetapool, crvLpSupply, 0, dolaMinOut);
+        uint dolaOut = zapDepositor.remove_liquidity_one_coin(crvMetapool, crvLpSupply(), 0, dolaMinOut);
         if(dolaOut > dolaSupply){
             dola.transfer(gov, dolaOut - dolaSupply);
             dola.burn(dolaSupply);
@@ -162,7 +160,6 @@ contract ConvexFed is CurvePoolAdapter{
             dola.burn(dolaOut);
             dolaSupply -= dolaOut;
         }
-        crvLpSupply = 0;
         emit Contraction(dolaOut);
     }
 
@@ -172,24 +169,29 @@ contract ConvexFed is CurvePoolAdapter{
     @dev See dev note on Contraction method
     */
     function takeProfit(bool harvestLP) public {
-        //Unsure whether or not this function needs to be guarded
-        require(msg.sender == chair, "ONLY CHAIR");
         //This takes crvLP at face value, but doesn't take into account slippage or fees
         //Worth considering that the additional transaction fees incurred by withdrawing the small amount of profit generated by tx fees,
         //may not eclipse additional transaction costs. Set harvestLP = false to only withdraw crv and cvx rewards.
-        uint crvLpValue = IMetaPool(crvMetapool).get_virtual_price()*crvLpSupply / 10**18;
+        uint crvLpValue = IMetaPool(crvMetapool).get_virtual_price()*crvLpSupply() / 10**18;
         if(harvestLP && crvLpValue > dolaSupply) {
+            require(msg.sender == chair, "ONLY CHAIR CAN TAKE CRV LP PROFIT");
             uint dolaSurplus = crvLpValue - dolaSupply;
             uint crvLpToWithdraw = lpForDola(dolaSurplus);
-            crvLpSupply -= crvLpToWithdraw;
-            require(convexBaseRewardPool.withdrawAndUnwrap(crvLpToWithdraw, true), "CONVEX WITHDRAW FAILED");
+            require(baseRewardPool.withdrawAndUnwrap(crvLpToWithdraw, false), "CONVEX WITHDRAW FAILED");
             uint dolaProfit = metapoolWithdraw(dolaSurplus, maxLossTakeProfitBps);
             require(dolaProfit > 0, "NO PROFIT");
             dola.transfer(gov, dolaProfit);
         }
         //TODO: Withdraw directly to treasury?
-        require(convexBaseRewardPool.getReward());
+        require(baseRewardPool.getReward());
         crv.transfer(gov, crv.balanceOf(address(this)));
         CVX.transfer(gov, CVX.balanceOf(address(this)));
+    }
+    
+    /**
+    @notice View function for getting crvLP tokens in the contract + convex baseRewardPool
+    */
+    function crvLpSupply() public view returns(uint){
+        return IERC20(crvMetapool).balanceOf(address(this)) + baseRewardPool.balanceOf(address(this));
     }
 }
