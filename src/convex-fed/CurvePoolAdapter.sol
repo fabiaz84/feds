@@ -7,11 +7,11 @@ import "src/interfaces/curve/IZapDepositor3pool.sol";
 
 abstract contract CurvePoolAdapter {
 
-    IERC20 dola;
-    address crvMetapool;
-    IZapDepositor3pool zapDepositor;
-    uint constant PRECISION = 10_000;
-    uint immutable CRVPRECISION;
+    IERC20 public dola;
+    address public crvMetapool;
+    IZapDepositor3pool public zapDepositor;
+    uint public constant PRECISION = 10_000;
+    uint public immutable CRVPRECISION;
 
     constructor(address dola_, address crvMetapool_, address zapDepositor_, uint CRVPRECISION_){
         dola = IERC20(dola_);
