@@ -109,8 +109,7 @@ contract ConvexFed is CurvePoolAdapter{
 
     /**
     @notice Withdraws an amount of dola token to be burnt, contracting DOLA dolaSupply
-    @dev Be careful when setting maxLoss parameter. There will almost always be some loss,
-    if the yEarn vault is forced to withdraw from dola strategies. 
+    @dev Be careful when setting maxLoss parameter. There will almost always be some slippage when trading.
     For example, slippage + trading fees may be incurred when withdrawing from a Curve pool.
     On the other hand, setting the maxLoss too high, may cause you to be front run by MEV
     sandwhich bots, making sure your entire maxLoss is incurred.
@@ -182,7 +181,6 @@ contract ConvexFed is CurvePoolAdapter{
             require(dolaProfit > 0, "NO PROFIT");
             dola.transfer(gov, dolaProfit);
         }
-        //TODO: Withdraw directly to treasury?
         require(baseRewardPool.getReward());
         crv.transfer(gov, crv.balanceOf(address(this)));
         CVX.transfer(gov, CVX.balanceOf(address(this)));

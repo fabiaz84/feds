@@ -22,7 +22,6 @@ abstract contract CurvePoolAdapter {
         dola.approve(zapDepositor_, type(uint256).max);
         IERC20(crvMetapool_).approve(zapDepositor_, type(uint256).max);
     }
-    event log_uint(uint);
     /**
     @notice Function for depositing into curve metapool.
 
