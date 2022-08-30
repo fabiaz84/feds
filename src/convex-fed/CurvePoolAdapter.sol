@@ -48,12 +48,17 @@ abstract contract CurvePoolAdapter {
     @return Amount of Dola tokens received
     */
     function metapoolWithdraw(uint amountDola, uint allowedSlippage) internal returns(uint256){
-        //TODO: May be more accurate ways to calculate this
         uint[4] memory amounts = [amountDola, 0, 0 , 0];
         uint amountCrvLp = zapDepositor.calc_token_amount(crvMetapool, amounts, false);
-        require(amountDola > amountCrvLp*IMetaPool(crvMetapool).get_virtual_price() / 10**18 * (PRECISION - allowedSlippage) / PRECISION, "LOSS EXCEED WITHDRAW MAX LOSS");
-        uint dolaMinOut = amountDola * (PRECISION - allowedSlippage) / PRECISION;
+        uint expectedCrvLp = amountDola * 10**18 / IMetaPool(crvMetapool).get_virtual_price();
+        //The expectedCrvLp must be higher or equal than the crvLp amount we supply - the allowed slippage
+        require(expectedCrvLp >= applySlippage(amountCrvLp, allowedSlippage), "LOSS EXCEED WITHDRAW MAX LOSS");
+        uint dolaMinOut = applySlippage(amountDola, allowedSlippage);
         return zapDepositor.remove_liquidity_one_coin(crvMetapool, amountCrvLp, 0, dolaMinOut);
+    }
+
+    function applySlippage(uint amount, uint allowedSlippage) internal pure returns(uint256){
+        return amount * (PRECISION - allowedSlippage) / PRECISION;
     }
 
     function lpForDola(uint amountDola) internal view returns(uint256){

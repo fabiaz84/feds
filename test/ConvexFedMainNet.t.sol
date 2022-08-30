@@ -309,7 +309,7 @@ contract ConvexFedTest is DSTest {
     function testTakeProfit_FailWithOnlyChair_whenCalledByOtherAddress() public {
         vm.prank(chair);
         convexFed.expansion(1000_000 ether);
-        washTrade(1000_000 ether, 100);
+        washTrade(10_000_000 ether, 100);
  
         vm.prank(dolaFaucet);
         vm.expectRevert("ONLY CHAIR CAN TAKE CRV LP PROFIT");
