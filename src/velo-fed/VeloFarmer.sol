@@ -28,7 +28,6 @@ contract VeloFarmer {
     error OnlyGov();
     error MaxSlippageTooHigh();
     error NotEnoughTokens();
-    error PercentOutOfRange();
     
     constructor(
             address payable routerAddr_, 
@@ -80,11 +79,10 @@ contract VeloFarmer {
         uint minOut = halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         uint[] memory amounts = router.swapExactTokensForTokensSimple(halfDolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
 
-        (uint dolaRequired, uint usdcRequired,) = router.quoteAddLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1]);
-        dolaRequired = dolaRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
-        usdcRequired = usdcRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        uint dolaAmountMin = halfDolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        uint usdcAmountMin = dolaAmountMin / DOLA_USDC_CONVERSION_MULTI;
 
-        router.addLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1], dolaRequired, usdcRequired, address(this), block.timestamp);
+        router.addLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1], dolaAmountMin, usdcAmountMin, address(this), block.timestamp);
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
     }
 
@@ -94,11 +92,10 @@ contract VeloFarmer {
     function deposit(uint dolaAmount, uint usdcAmount) public {
         if (msg.sender != chair) revert OnlyChair();
 
-        (uint dolaRequired, uint usdcRequired,) = router.quoteAddLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount);
-        dolaRequired = dolaRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
-        usdcRequired = usdcRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        uint dolaAmountMin = dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        uint usdcAmountMin = usdcAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
 
-        router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, dolaRequired, usdcRequired, address(this), block.timestamp);
+        router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, dolaAmountMin, usdcAmountMin, address(this), block.timestamp);
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
     }
 
@@ -110,10 +107,30 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Withdraws `percent`% of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC and swaps redeemed USDC to DOLA.
+    @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
     */
-    function withdrawLiquidityAndSwapToDOLA(uint percent) external {
-        uint usdcAmount = withdrawLiquidity(percent);
+    function withdrawLiquidity(uint dolaAmount) public returns (uint) {
+        if (msg.sender != chair) revert OnlyChair();
+
+        uint liquidity = dolaGauge.balanceOf(address(this));
+        (uint dolaAmountOut, ) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, liquidity);
+        uint withdrawAmount = (dolaAmount / 2) * liquidity / dolaAmountOut;
+        if (withdrawAmount > liquidity) withdrawAmount = liquidity;
+
+        dolaGauge.withdraw(withdrawAmount);
+
+        uint dolaAmountMin = dolaAmount / 2 * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        uint usdcAmountMin = dolaAmountMin / DOLA_USDC_CONVERSION_MULTI;
+
+        (, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, withdrawAmount, dolaAmountMin, usdcAmountMin, address(this), block.timestamp);
+        return amountUSDC;
+    }
+
+    /**
+    @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC and swaps redeemed USDC to DOLA.
+    */
+    function withdrawLiquidityAndSwapToDOLA(uint dolaAmount) external {
+        uint usdcAmount = withdrawLiquidity(dolaAmount);
 
         swapUSDCtoDOLA(usdcAmount);
     }
@@ -123,7 +140,7 @@ contract VeloFarmer {
     */
     function withdrawToL1OptiFed(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
-        if (dolaAmount < DOLA.balanceOf(address(this))) revert NotEnoughTokens();
+        if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
 
         bridge.withdrawTo(address(DOLA), optiFed, dolaAmount, 0, "");
     }
@@ -133,8 +150,8 @@ contract VeloFarmer {
     */
     function withdrawToL1OptiFed(uint dolaAmount, uint usdcAmount) external {
         if (msg.sender != chair) revert OnlyChair();
-        if (dolaAmount < DOLA.balanceOf(address(this))) revert NotEnoughTokens();
-        if (usdcAmount < USDC.balanceOf(address(this))) revert NotEnoughTokens();
+        if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
+        if (usdcAmount > USDC.balanceOf(address(this))) revert NotEnoughTokens();
 
         bridge.withdrawTo(address(DOLA), optiFed, dolaAmount, 0, "");
         bridge.withdrawTo(address(USDC), optiFed, usdcAmount, 0, "");
@@ -159,24 +176,6 @@ contract VeloFarmer {
         if (amount > IERC20(token).balanceOf(address(this))) revert NotEnoughTokens();
 
         require(IERC20(token).transfer(to, amount), "Token transfer failed");
-    }
-
-    /**
-    @notice Withdraws `percent`% of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
-    */
-    function withdrawLiquidity(uint percent) public returns (uint) {
-        if (msg.sender != chair) revert OnlyChair();
-        if (percent == 0 || percent > 100) revert PercentOutOfRange();
-
-        uint withdrawAmount = IERC20(address(dolaGauge)).balanceOf(address(this)) * percent / 100;
-        dolaGauge.withdraw(withdrawAmount);
-
-        (uint dolaRequired, uint usdcRequired) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, withdrawAmount);
-        dolaRequired = dolaRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
-        usdcRequired = usdcRequired * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
-
-        (, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, withdrawAmount, dolaRequired, usdcRequired, address(this), block.timestamp);
-        return amountUSDC;
     }
 
     /**

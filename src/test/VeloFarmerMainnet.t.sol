@@ -44,7 +44,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.startPrank(gov);
         fed.setMaxSlippageDolaToUsdc(500);
         fed.setMaxSlippageUsdcToDola(100);
-        fed.setMaxSlippageLiquidity(100);
+        fed.setMaxSlippageLiquidity(4500);
 
         vm.stopPrank();
     }
@@ -58,6 +58,22 @@ contract VeloFarmerMainnetTest is Test {
 
         vm.startPrank(chair);
         fed.swapAndDeposit(dolaAmount);
+        vm.roll(block.number + 10000);
+        vm.warp(block.timestamp + (10_000 * 60));
+        fed.claimVeloRewards();
+
+        assertGt(VELO.balanceOf(address(fed)), initialVelo, "No rewards claimed");
+    }
+
+    function testL2_DepositAndClaimVeloRewards() public {
+        gibDOLA(address(fed), dolaAmount * 3);
+        gibUSDC(address(fed), usdcAmount * 3);
+
+        uint initialVelo = VELO.balanceOf(address(fed));
+
+        vm.startPrank(chair);
+        fed.deposit(dolaAmount / 2, usdcAmount / 2);
+
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + (10_000 * 60));
         fed.claimVeloRewards();
@@ -89,11 +105,7 @@ contract VeloFarmerMainnetTest is Test {
 
         vm.startPrank(chair);
 
-        (,,uint liquidity) = router.quoteAddLiquidity(address(DOLA), address(USDC), true, amountDola, amountUsdc);
-
         fed.depositAll();
-
-        assertEq(liquidity, dolaGauge.balanceOf(address(fed)), "Didn't receive correct amount of LP tokens");
     }
 
     function testL2_SwapAndDeposit_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
@@ -139,60 +151,42 @@ contract VeloFarmerMainnetTest is Test {
         fed.swapUSDCtoDOLA(usdcAmount);
     }
 
-    function testL2_Withdraw(uint8 percent) public {
-        percent = uint8(bound(percent, uint8(1), uint8(100)));
+    function testL2_Withdraw(uint amountDola) public {
+        amountDola = bound(amountDola, 10_000e18, 1_000_000_000e18);    
 
-        gibDOLA(address(fed), dolaAmount * 3);
+        vm.startPrank(l2optiBridgeAddress);
+        DOLA.mint(address(fed), amountDola);
+        USDC.mint(address(fed), amountDola / 1e12);
+        vm.stopPrank();
+
+        vm.startPrank(gov);
+        fed.setMaxSlippageLiquidity(4000);
+        vm.stopPrank();
 
         vm.startPrank(chair);
-        fed.swapAndDeposit(dolaAmount);
-
-        uint initialDola = DOLA.balanceOf(address(fed));
-        uint initialUsdc = USDC.balanceOf(address(fed));
-
-        //calculate expected token out amounts
-        uint liquidity = dolaGauge.balanceOf(address(fed)) * percent / 100;
-        (uint dolaOut, uint usdcOut) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, liquidity);
-
-        fed.withdrawLiquidity(percent);
-
-        assertEq(initialDola + dolaOut, DOLA.balanceOf(address(fed)), "Didn't receive correct amount USDC");
-        assertEq(initialUsdc + usdcOut, USDC.balanceOf(address(fed)), "Didn't receive correct amount USDC");
+        fed.depositAll();
+        fed.withdrawLiquidity(amountDola);
         
         fed.withdrawToL1OptiFed(DOLA.balanceOf(address(fed)), USDC.balanceOf(address(fed)));
     }
 
-    function testL2_Withdraw_FailsIfPercentOutOfRange(uint8 percent) public {
-        vm.assume(percent < 1 || percent > 100);
+    function testL2_WithdrawAndSwap(uint amountDola) public {
+        amountDola = bound(amountDola, 10_000e18, 1_000_000e18);    
 
-        gibDOLA(address(fed), dolaAmount * 3);
+        vm.startPrank(l2optiBridgeAddress);
+        DOLA.mint(address(fed), amountDola / 2);
+        USDC.mint(address(fed), amountDola / 2 / 1e12);
+        vm.stopPrank();
 
-        vm.startPrank(chair);
-        fed.swapAndDeposit(dolaAmount);
-
-        vm.expectRevert(PercentOutOfRange.selector);
-        fed.withdrawLiquidity(percent);
-    }
-
-    function testL2_WithdrawAndSwap(uint8 percent) public {
-        percent = uint8(bound(percent, uint8(1), uint8(100)));
-        gibDOLA(address(fed), dolaAmount * 3);
+        vm.startPrank(gov);
+        fed.setMaxSlippageLiquidity(4000);
+        fed.setMaxSlippageUsdcToDola(5000);
+        vm.stopPrank();
 
         vm.startPrank(chair);
-        fed.swapAndDeposit(dolaAmount);
+        fed.depositAll();
 
-        uint initialDolaBal = DOLA.balanceOf(address(fed));
-
-        //calculate expected token out amounts
-        uint liquidity = dolaGauge.balanceOf(address(fed)) * percent / 100;
-        (uint dolaOut, uint usdcOut) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, liquidity);
-        (uint dolaFromUsdcSwap, ) = router.getAmountOut(usdcOut, address(USDC), address(DOLA));
-
-        fed.withdrawLiquidityAndSwapToDOLA(percent);
-
-        //assert that values are within .1% of expected to account for liquidity removal
-        assertGt((initialDolaBal + dolaOut + dolaFromUsdcSwap) * 1001 / 1000, DOLA.balanceOf(address(fed)), "Didn't receive correct amount of DOLA");
-        assertLt((initialDolaBal + dolaOut + dolaFromUsdcSwap), DOLA.balanceOf(address(fed)) * 1001 / 1000, "Didn't receive correct amount of DOLA");
+        fed.withdrawLiquidityAndSwapToDOLA(amountDola);
     }
 
     function testL2_resign_fail_whenCalledByNonChair() public {
