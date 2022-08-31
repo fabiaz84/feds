@@ -5,6 +5,7 @@ import "ds-test/test.sol";
 import "forge-std/Test.sol";
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { IDola } from "../interfaces/velo/IDola.sol";
+import "../interfaces/velo/IL2CrossDomainMessenger.sol";
 import "../velo-fed/VeloFarmer.sol";
 import {OptiFed} from "../velo-fed/OptiFed.sol";
 
@@ -18,6 +19,10 @@ contract VeloFarmerMainnetTest is Test {
     address public l2optiBridgeAddress = 0x4200000000000000000000000000000000000010;
     address public dolaUsdcPoolAddy = 0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d;
     address public optiFedAddress = address(0xA);
+    IL2CrossDomainMessenger public l2CrossDomainMessenger = IL2CrossDomainMessenger(0x4200000000000000000000000000000000000007);
+    address public l1CrossDomainMessenger = 0x36BDE71C97B33Cc4729cf772aE268934f7AB70B2;
+
+    uint nonce;
 
     //EOAs
     address user = address(69);
@@ -34,6 +39,10 @@ contract VeloFarmerMainnetTest is Test {
     error OnlyGov();
     error OnlyChair();
     error PercentOutOfRange();
+
+    function relayGovMessage(bytes memory message) public {
+        l2CrossDomainMessenger.relayMessage(address(fed), gov, message, nonce++);
+    }
     
     function setUp() public {
         vm.startPrank(chair);
@@ -41,10 +50,11 @@ contract VeloFarmerMainnetTest is Test {
         fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, l2optiBridgeAddress, optiFedAddress);
 
         vm.stopPrank();
-        vm.startPrank(gov);
-        fed.setMaxSlippageDolaToUsdc(500);
-        fed.setMaxSlippageUsdcToDola(100);
-        fed.setMaxSlippageLiquidity(4500);
+        vm.startPrank(l1CrossDomainMessenger);
+
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", 500));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", 100));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
 
         vm.stopPrank();
     }
@@ -111,8 +121,8 @@ contract VeloFarmerMainnetTest is Test {
     function testL2_SwapAndDeposit_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
         gibDOLA(address(fed), dolaAmount * 3);
 
-        vm.startPrank(gov);
-        fed.setMaxSlippageDolaToUsdc(100);
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", 100));
         vm.stopPrank();
 
         vm.startPrank(chair);
@@ -123,8 +133,8 @@ contract VeloFarmerMainnetTest is Test {
     function testL2_SwapDolaToUsdc_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
         gibDOLA(address(fed), dolaAmount * 3);
 
-        vm.startPrank(gov);
-        fed.setMaxSlippageDolaToUsdc(100);
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", 100));
         vm.stopPrank();
 
         vm.startPrank(chair);
@@ -142,8 +152,8 @@ contract VeloFarmerMainnetTest is Test {
         router.swapExactTokensForTokensSimple(usdcToSwap, 0, address(USDC), address(DOLA), true, address(user), block.timestamp);
         vm.stopPrank();
 
-        vm.startPrank(gov);
-        fed.setMaxSlippageUsdcToDola(100);
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", 100));
         vm.stopPrank();
 
         vm.startPrank(chair);
@@ -159,8 +169,8 @@ contract VeloFarmerMainnetTest is Test {
         USDC.mint(address(fed), amountDola / 1e12);
         vm.stopPrank();
 
-        vm.startPrank(gov);
-        fed.setMaxSlippageLiquidity(4000);
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4000));
         vm.stopPrank();
 
         vm.startPrank(chair);
@@ -178,9 +188,9 @@ contract VeloFarmerMainnetTest is Test {
         USDC.mint(address(fed), amountDola / 2 / 1e12);
         vm.stopPrank();
 
-        vm.startPrank(gov);
-        fed.setMaxSlippageLiquidity(4000);
-        fed.setMaxSlippageUsdcToDola(5000);
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4000));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", 5000));
         vm.stopPrank();
 
         vm.startPrank(chair);

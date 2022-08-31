@@ -4,6 +4,7 @@ import "../interfaces/IERC20.sol";
 import {IRouter} from "../interfaces/velo/IRouter.sol";
 import {IGauge} from "../interfaces/velo/IGauge.sol";
 import {IL2ERC20Bridge} from "../interfaces/velo/IL2ERC20Bridge.sol";
+import {ICrossDomainMessenger} from "../interfaces/velo/ICrossDomainMessenger.sol";
 
 contract VeloFarmer {
     address public chair;
@@ -21,6 +22,7 @@ contract VeloFarmer {
     IERC20 public immutable USDC;
     IERC20 public immutable LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
     address public immutable veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
+    ICrossDomainMessenger public immutable ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
     IL2ERC20Bridge public immutable bridge;
     address public optiFed;
 
@@ -50,6 +52,13 @@ contract VeloFarmer {
         USDC.approve(routerAddr_, type(uint256).max);
         LP_TOKEN.approve(address(dolaGauge), type(uint).max);
         LP_TOKEN.approve(address(router), type(uint).max);
+    }
+
+    modifier onlyGov() {
+        if (msg.sender != address(ovmL2CrossDomainMessenger) ||
+            ovmL2CrossDomainMessenger.xDomainMessageSender() != gov
+        ) revert OnlyGov();
+        _;
     }
 
     /**
@@ -171,8 +180,7 @@ contract VeloFarmer {
     /**
     @notice Allows `gov` to transfer tokens on this contract's behalf.
     */
-    function transferTokens(address token, address to, uint amount) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function transferTokens(address token, address to, uint amount) external onlyGov {
         if (amount > IERC20(token).balanceOf(address(this))) revert NotEnoughTokens();
 
         require(IERC20(token).transfer(to, amount), "Token transfer failed");
@@ -210,8 +218,7 @@ contract VeloFarmer {
     @notice Governance only function for setting acceptable slippage when swapping DOLA -> USDC
     @param newMaxSlippageBps The new maximum allowed loss for DOLA -> USDC swaps. 1 = 0.01%
     */
-    function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) onlyGov external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsDolaToUsdc = newMaxSlippageBps;
     }
@@ -220,8 +227,7 @@ contract VeloFarmer {
     @notice Governance only function for setting acceptable slippage when swapping USDC -> DOLA
     @param newMaxSlippageBps The new maximum allowed loss for USDC -> DOLA swaps. 1 = 0.01%
     */
-    function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) onlyGov external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsUsdcToDola = newMaxSlippageBps;
     }
@@ -230,8 +236,7 @@ contract VeloFarmer {
     @notice Governance only function for setting acceptable slippage when adding or removing liquidty from DOLA/USDC pool
     @param newMaxSlippageBps The new maximum allowed loss for adding/removing liquidity from DOLA/USDC pool. 1 = 0.01%
     */
-    function setMaxSlippageLiquidity(uint newMaxSlippageBps) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function setMaxSlippageLiquidity(uint newMaxSlippageBps) onlyGov external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsLiquidity = newMaxSlippageBps;
     }
@@ -239,24 +244,21 @@ contract VeloFarmer {
     /**
     @notice Method for gov to change gov address
     */
-    function changeGov(address newGov_) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function changeGov(address newGov_) external onlyGov {
         gov = newGov_;
     }
 
     /**
     @notice Method for gov to change the chair
     */
-    function changeChair(address newChair_) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function changeChair(address newChair_) external onlyGov {
         chair = newChair_;
     }
 
     /**
     @notice Method for gov to change the L1 optiFed address
     */
-    function changeOptiFed(address newOptiFed_) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function changeOptiFed(address newOptiFed_) external onlyGov {
         optiFed = newOptiFed_;
     }
 }
