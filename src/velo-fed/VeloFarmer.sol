@@ -8,6 +8,7 @@ import {ICrossDomainMessenger} from "../interfaces/velo/ICrossDomainMessenger.so
 
 contract VeloFarmer {
     address public chair;
+    address public l2chair;
     address public gov;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
@@ -61,6 +62,14 @@ contract VeloFarmer {
         _;
     }
 
+    modifier onlyChair() {
+        if ((msg.sender != address(ovmL2CrossDomainMessenger) ||
+            ovmL2CrossDomainMessenger.xDomainMessageSender() != chair) &&
+            msg.sender != l2chair
+        ) revert OnlyChair();
+        _;
+    }
+
     /**
     @notice Claims all Velodrome VELO token rewards accrued by this contract
     */
@@ -81,9 +90,7 @@ contract VeloFarmer {
     /**
     @notice Swaps half of `dolaAmount` into USDC through Velodrome. Adds liquidity to DOLA/USDC pool, then deposits LP tokens into DOLA gauge.
     */
-    function swapAndDeposit(uint dolaAmount) external {
-        if (msg.sender != chair) revert OnlyChair();
-
+    function swapAndDeposit(uint dolaAmount) external onlyChair {
         uint halfDolaAmount = dolaAmount / 2;
         uint minOut = halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         uint[] memory amounts = router.swapExactTokensForTokensSimple(halfDolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
@@ -98,9 +105,7 @@ contract VeloFarmer {
     /**
     @notice Attempts to deposit `dolaAmount` of DOLA & `usdcAmount` of USDC into Velodrome DOLA/USDC stable pool. Then, deposits LP tokens into gauge.
     */
-    function deposit(uint dolaAmount, uint usdcAmount) public {
-        if (msg.sender != chair) revert OnlyChair();
-
+    function deposit(uint dolaAmount, uint usdcAmount) public onlyChair {
         uint dolaAmountMin = dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         uint usdcAmountMin = usdcAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
 
@@ -118,9 +123,7 @@ contract VeloFarmer {
     /**
     @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
     */
-    function withdrawLiquidity(uint dolaAmount) public returns (uint) {
-        if (msg.sender != chair) revert OnlyChair();
-
+    function withdrawLiquidity(uint dolaAmount) public onlyChair returns (uint) {
         uint liquidity = dolaGauge.balanceOf(address(this));
         (uint dolaAmountOut, ) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, liquidity);
         uint withdrawAmount = (dolaAmount / 2) * liquidity / dolaAmountOut;
@@ -147,8 +150,7 @@ contract VeloFarmer {
     /**
     @notice Withdraws `dolaAmount` of DOLA to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
     */
-    function withdrawToL1OptiFed(uint dolaAmount) external {
-        if (msg.sender != chair) revert OnlyChair();
+    function withdrawToL1OptiFed(uint dolaAmount) external onlyChair {
         if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
 
         bridge.withdrawTo(address(DOLA), optiFed, dolaAmount, 0, "");
@@ -157,8 +159,7 @@ contract VeloFarmer {
     /**
     @notice Withdraws `dolaAmount` of DOLA & `usdcAmount` of USDC to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
     */
-    function withdrawToL1OptiFed(uint dolaAmount, uint usdcAmount) external {
-        if (msg.sender != chair) revert OnlyChair();
+    function withdrawToL1OptiFed(uint dolaAmount, uint usdcAmount) external onlyChair {
         if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
         if (usdcAmount > USDC.balanceOf(address(this))) revert NotEnoughTokens();
 
@@ -169,8 +170,7 @@ contract VeloFarmer {
     /**
     @notice Withdraws `amount` of `l2Token` to address `to` on L1. Will take 7 days before withdraw is claimable.
     */
-    function withdrawTokensToL1(address l2Token, address to, uint amount) external {
-        if (msg.sender != chair) revert OnlyChair();
+    function withdrawTokensToL1(address l2Token, address to, uint amount) external onlyChair {
         if (amount > IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
 
         IERC20(l2Token).approve(address(bridge), amount);
@@ -189,9 +189,7 @@ contract VeloFarmer {
     /**
     @notice Swap `usdcAmount` of USDC to DOLA through velodrome.
     */
-    function swapUSDCtoDOLA(uint usdcAmount) public {
-        if (msg.sender != chair) revert OnlyChair();
-
+    function swapUSDCtoDOLA(uint usdcAmount) public onlyChair {
         uint minOut = usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
         router.swapExactTokensForTokensSimple(usdcAmount, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);
     }
@@ -199,9 +197,7 @@ contract VeloFarmer {
     /**
     @notice Swap `dolaAmount` of DOLA to USDC through velodrome.
     */
-    function swapDOLAtoUSDC(uint dolaAmount) public {
-        if (msg.sender != chair) revert OnlyChair();
-        
+    function swapDOLAtoUSDC(uint dolaAmount) public onlyChair { 
         uint minOut = dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         router.swapExactTokensForTokensSimple(dolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
     }
@@ -209,9 +205,12 @@ contract VeloFarmer {
     /**
     @notice Method for current chair of the fed to resign
     */
-    function resign() external {
-        if (msg.sender != chair) revert OnlyChair();
-        chair = address(0);
+    function resign() external onlyChair {
+        if (msg.sender == l2chair) {
+            l2chair = address(0);
+        } else {
+            chair = address(0);
+        }
     }
 
     /**
@@ -253,6 +252,13 @@ contract VeloFarmer {
     */
     function changeChair(address newChair_) external onlyGov {
         chair = newChair_;
+    }
+
+    /**
+    @notice Method for gov to change the L2 chair
+    */
+    function changeL2Chair(address newL2Chair_) external onlyGov {
+        l2chair = newL2Chair_;
     }
 
     /**
