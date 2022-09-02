@@ -4,29 +4,31 @@ import "src/interfaces/balancer/IVault.sol";
 import "src/interfaces/IERC20.sol";
 
 contract BalancerMetapoolAdapter {
-
+    
+    uint constant BPS = 10_000;
     bytes32 immutable poolId;
-    address immutable dola;
-    address immutable bpt;
+    IERC20 immutable dola;
+    IERC20 immutable bpt;
     IVault vault;
     IAsset[] assets = new IAsset[](0);
     uint dolaIndex = type(uint).max;
     
     constructor(bytes32 poolId_, address dola_, address vault_){
         poolId = poolId_;
-        dola = dola_;
+        dola = IERC20(dola_);
         vault = IVault(vault_);
-        (bpt,) = vault.getPool(poolId_);
+        (address bptAddress,) = vault.getPool(poolId_);
+        bpt = IERC20(bptAddress);
         (IERC20[] memory tokens,,) = vault.getPoolTokens(poolId_);
         for(uint i; i<tokens.length; i++){
             assets.push(IAsset(address(tokens[i])));
-            if(address(tokens[i]) == dola_){
+            if(tokens[i] == dola){
                 dolaIndex = i;
             }
         }
         require(dolaIndex < type(uint).max, "Underlying token not found");
-        IERC20(dola).approve(vault_, type(uint).max);
-        IERC20(bpt).approve(vault_, type(uint).max);
+        dola.approve(vault_, type(uint).max);
+        bpt.approve(vault_, type(uint).max);
     }
 
     function getUserDataExactInDola(uint amountIn) internal view returns(bytes memory) {
@@ -45,7 +47,11 @@ contract BalancerMetapoolAdapter {
         uint[] memory amounts = new uint[](assets.length);
         amounts[dolaIndex] = exactDolaOut;
         return abi.encode(2, amounts, maxBPTin);
-    } 
+    }
+
+    function getUserDataExitExact(uint exactBptIn) internal view returns(bytes memory) {
+        return abi.encode(1, exactBptIn, dolaIndex);
+    }
 
     function createJoinPoolRequest(uint dolaAmount) internal view returns(IVault.JoinPoolRequest memory){
         IVault.JoinPoolRequest memory jpr;
@@ -67,15 +73,40 @@ contract BalancerMetapoolAdapter {
         return epr;
     }
 
-    function _deposit(uint dolaAmount, uint maxSlippage) internal {
-        //TODO: Make sure slippage is accounted for
-        vault.joinPool(poolId, address(this), address(this), createJoinPoolRequest(dolaAmount));
+    function createExitExactPoolRequest(uint bptAmount, uint minDolaOut) internal view returns (IVault.ExitPoolRequest memory){
+        IVault.ExitPoolRequest memory epr;
+        epr.assets = assets;
+        epr.minAmountsOut = new uint[](assets.length);
+        epr.minAmountsOut[dolaIndex] = minDolaOut;
+        epr.userData = getUserDataExitExact(bptAmount);
+        epr.toInternalBalance = false;
+        return epr;
     }
 
-    function _withdraw(uint dolaAmount, uint maxSlippage) internal {
+    function _deposit(uint dolaAmount, uint maxSlippage) internal returns(uint){
+        //TODO: Make sure slippage is accounted for
+        uint init = bpt.balanceOf(address(this));
+        vault.joinPool(poolId, address(this), address(this), createJoinPoolRequest(dolaAmount));
+        return bpt.balanceOf(address(this)) - init;
+    }
+
+    function _withdraw(uint dolaAmount, uint maxSlippage) internal returns(uint){
         //TODO: Calculate maxBPTin in a way that accounts for slippage
         //TODO: THIS IS CURRENTLY UNSAFE!
+        uint init = dola.balanceOf(address(this));
         uint maxBPTin = type(uint).max;
         vault.exitPool(poolId, address(this), payable(address(this)), createExitPoolRequest(dolaAmount, maxBPTin));
+        uint dolaOut = dola.balanceOf(address(this)) - init;
+        require(dolaOut >= dolaAmount * BPS / maxSlippage,  "NOT ENOUGH DOLA RECEIVED");
+        return dolaOut;
+    }
+
+    function _withdrawAll(uint expectedDolaAmount, uint maxSlippage) internal returns(uint){
+        uint toWithdraw = bpt.balanceOf(address(this));
+        vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(expectedDolaAmount, expectedDolaAmount * BPS / maxSlippage));
+    }
+
+    function bptForDola(uint dolaAmount) public view returns(uint) {
+        revert("NOT IMPLEMENTED YET");
     }
 }

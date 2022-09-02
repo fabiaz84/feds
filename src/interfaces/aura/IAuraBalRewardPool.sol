@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity 0.8.13;
+
+import "./IAuraLocker.sol";
 
 interface IAuraBalRewardPool {
+    function auraLocker() external view returns (IAuraLocker);
+
+    function rewardToken() external view returns (address);
+
     function totalSupply() external view returns (uint256);
 
     function balanceOf(address account) external view returns (uint256);
@@ -16,7 +22,7 @@ interface IAuraBalRewardPool {
 
     function stakeAll() external returns (bool);
 
-    function stakeFor(address _for, uint256 _amount) external updateReward(_for) returns (bool);
+    function stakeFor(address _for, uint256 _amount) external  returns (bool);
 
     function withdraw(uint256 amount, bool claim, bool lock) external returns (bool);
 
@@ -24,7 +30,7 @@ interface IAuraBalRewardPool {
      * @dev Gives a staker their rewards
      * @param _lock Lock the rewards? If false, takes a 20% haircut
      */
-    function getReward(bool _lock) external updateReward(msg.sender) returns (bool);
+    function getReward(bool _lock) external returns (bool);
 
     /**
      * @dev Forwards to the penalty forwarder for distro to Aura Lockers

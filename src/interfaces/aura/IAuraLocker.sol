@@ -1,6 +1,8 @@
 pragma solidity ^0.8.13;
 
 interface IAuraLocker {
+    function delegate(address _newDelegate) external;
+
     function lock(address _account, uint256 _amount) external;
 
     function checkpointEpoch() external;
@@ -16,4 +18,8 @@ interface IAuraLocker {
     function getReward(address _account, bool _stake) external;
 
     function getReward(address _account) external;
+
+    function balanceOf(address _user) external view returns (uint256);
+
+    function rewardTokens() external view returns (address[] memory);
 }
