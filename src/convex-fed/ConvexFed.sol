@@ -33,15 +33,14 @@ contract ConvexFed is CurvePoolAdapter{
             address gov_, 
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
-            uint maxLossTakeProfitBps_,
-            uint poolId_) 
+            uint maxLossTakeProfitBps_)
             CurvePoolAdapter(dola_, crvPoolAddr)
     {
         booster = IConvexBooster(booster_);
         baseRewardPool = IConvexBaseRewardPool(baseRewardPool_);
         crv = IERC20(baseRewardPool.rewardToken());
         CVX = IERC20(CVX_);
-        poolId = poolId_;
+        poolId = baseRewardPool.pid();
         IERC20(crvPoolAddr).approve(booster_, type(uint256).max);
         IERC20(crvPoolAddr).approve(baseRewardPool_, type(uint256).max);
         maxLossExpansionBps = maxLossExpansionBps_;
