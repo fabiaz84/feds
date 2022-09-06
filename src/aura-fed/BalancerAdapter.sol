@@ -3,6 +3,10 @@ pragma solidity ^0.8.13;
 import "src/interfaces/balancer/IVault.sol";
 import "src/interfaces/IERC20.sol";
 
+interface BPT is IERC20{
+    function getPoolId() external view returns (bytes32);
+}
+
 contract BalancerMetapoolAdapter {
     
     uint constant BPS = 10_000;
@@ -106,7 +110,18 @@ contract BalancerMetapoolAdapter {
         vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(expectedDolaAmount, expectedDolaAmount * BPS / maxSlippage));
     }
 
-    function bptForDola(uint dolaAmount) public view returns(uint) {
+    function bptValue(address bpt) public view returns(uint){
+        //TODO: Add function for taking aTokens into account
+        bytes32 _poolId = BPT(bpt).getPoolId();
+        (IERC20[] memory tokens, uint256[] memory balances, uint lastChange) = vault.getPoolTokens(_poolId);
+        uint totalBalance;
+        for(uint i; i < balances.length; i++){
+            totalBalance += balances[i];
+        }
+        return totalBalance*10**18/IERC20(bpt).totalSupply();
+    }
+
+    function bptFromDola(uint dolaAmount) public view returns(uint) {
         revert("NOT IMPLEMENTED YET");
     }
 }
