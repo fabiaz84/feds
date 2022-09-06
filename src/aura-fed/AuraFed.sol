@@ -124,7 +124,7 @@ contract AuraFed is BalancerMetapoolAdapter{
     function contraction(uint amountDola) public {
         require(msg.sender == chair, "ONLY CHAIR");
         //Calculate how many lp tokens are needed to withdraw the dola
-        uint bptNeeded = bptForDola(amountDola);
+        uint bptNeeded = bptFromDola(amountDola);
         require(bptNeeded <= bptSupply(), "Not enough BPT tokens");
 
         //Withdraw BPT tokens from aura, but don't claim rewards
@@ -179,7 +179,7 @@ contract AuraFed is BalancerMetapoolAdapter{
         if(harvestLP && bptValue > dolaSupply) {
             require(msg.sender == chair, "ONLY CHAIR CAN TAKE BPT PROFIT");
             uint dolaSurplus = bptValue - dolaSupply;
-            uint bptToWithdraw = bptForDola(dolaSurplus);
+            uint bptToWithdraw = bptFromDola(dolaSurplus);
             require(baseRewardPool.withdraw(bptToWithdraw, false, false), "AURA WITHDRAW FAILED");
             uint dolaProfit = _withdraw(dolaSurplus, maxLossTakeProfitBps);
             require(dolaProfit > 0, "NO PROFIT");
