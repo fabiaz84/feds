@@ -38,12 +38,12 @@ contract ConvexFedTest is DSTest {
     function setUp() public {
         convexFed = new ConvexFed(
             address(dola),
-            address(crv),
             address(cvx),
             address(crvPool),
             address(zapDepositor),
             address(convexBooster),
             address(baseRewardPool),
+            chair,
             gov,
             maxLossExpansionBps,
             maxLossWithdrawBps,
@@ -51,7 +51,6 @@ contract ConvexFedTest is DSTest {
             convexPID
         );
         vm.startPrank(gov);
-        convexFed.changeChair(chair);
         dola.addMinter(address(convexFed));
         dola.addMinter(dolaFaucet);
         vm.stopPrank();
