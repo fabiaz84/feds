@@ -40,7 +40,7 @@ contract ConvexFedTest is DSTest {
             address(dola),
             address(cvx),
             address(crvPool),
-            address(zapDepositor),
+            //address(zapDepositor),
             address(convexBooster),
             address(baseRewardPool),
             chair,
