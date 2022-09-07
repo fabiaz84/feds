@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "ds-test/test.sol";
 import "forge-std/Test.sol";
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { IDola } from "../interfaces/velo/IDola.sol";
