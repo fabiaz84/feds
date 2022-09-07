@@ -88,7 +88,7 @@ contract VeloFarmer {
     @notice Attempts to claim token rewards & transfer all reward tokens owned by this contract to `treasury`
     @param addrs Array of token addresses to claim rewards of.
     */
-    function claimRewards(address[] calldata addrs) external {
+    function claimRewards(address[] calldata addrs) external onlyChair {
         dolaGauge.getReward(address(this), addrs);
 
         for (uint i = 0; i < addrs.length; i++) {
