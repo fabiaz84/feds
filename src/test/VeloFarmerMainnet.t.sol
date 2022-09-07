@@ -18,9 +18,11 @@ contract VeloFarmerMainnetTest is Test {
     IERC20 public USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
     address public l2optiBridgeAddress = 0x4200000000000000000000000000000000000010;
     address public dolaUsdcPoolAddy = 0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d;
+    address public veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
     address public optiFedAddress = address(0xA);
     IL2CrossDomainMessenger public l2CrossDomainMessenger = IL2CrossDomainMessenger(0x4200000000000000000000000000000000000007);
     address public l1CrossDomainMessenger = 0x36BDE71C97B33Cc4729cf772aE268934f7AB70B2;
+    address public treasury = 0xa283139017a2f5BAdE8d8e25412C600055D318F8;
 
     uint nonce;
 
@@ -50,16 +52,18 @@ contract VeloFarmerMainnetTest is Test {
     }
     
     function setUp() public {
+        vm.label(veloTokenAddr, "VELO");
+
         vm.startPrank(chair);
 
-        fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, l2optiBridgeAddress, optiFedAddress);
+        fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, treasury, l2optiBridgeAddress, optiFedAddress);
 
         vm.stopPrank();
         vm.startPrank(l1CrossDomainMessenger);
 
         relayGovMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", 500));
         relayGovMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", 100));
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 2000));
         relayGovMessage(abi.encodeWithSignature("changeL2Chair(address)", l2chair));
 
         vm.stopPrank();
@@ -67,25 +71,15 @@ contract VeloFarmerMainnetTest is Test {
 
     // L2
 
-    function testL2_SwapAndClaimVeloRewards() public {
-        gibDOLA(address(fed), dolaAmount * 3);
-
-        uint initialVelo = VELO.balanceOf(address(fed));
-
-        vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount);
-        vm.roll(block.number + 10000);
-        vm.warp(block.timestamp + (10_000 * 60));
-        fed.claimVeloRewards();
-
-        assertGt(VELO.balanceOf(address(fed)), initialVelo, "No rewards claimed");
-    }
-
     function testL2_DepositAndClaimVeloRewards() public {
         gibDOLA(address(fed), dolaAmount * 3);
         gibUSDC(address(fed), usdcAmount * 3);
 
-        uint initialVelo = VELO.balanceOf(address(fed));
+        uint initialVelo = VELO.balanceOf(address(treasury));
+
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        vm.stopPrank();
 
         vm.startPrank(l2chair);
         fed.deposit(dolaAmount / 2, usdcAmount / 2);
@@ -94,13 +88,35 @@ contract VeloFarmerMainnetTest is Test {
         vm.warp(block.timestamp + (10_000 * 60));
         fed.claimVeloRewards();
 
-        assertGt(VELO.balanceOf(address(fed)), initialVelo, "No rewards claimed");
+        assertGt(VELO.balanceOf(address(treasury)), initialVelo, "No rewards claimed");
+    }
+
+    function testL2_SwapAndClaimVeloRewards() public {
+        gibDOLA(address(fed), dolaAmount * 3);
+
+        uint initialVelo = VELO.balanceOf(address(treasury));
+
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        vm.stopPrank();
+
+        vm.startPrank(l2chair);
+        fed.swapAndDeposit(dolaAmount);
+        vm.roll(block.number + 10000);
+        vm.warp(block.timestamp + (10_000 * 60));
+        fed.claimVeloRewards();
+
+        assertGt(VELO.balanceOf(address(treasury)), initialVelo, "No rewards claimed");
     }
 
     function testL2_SwapAndClaimRewards() public {
         gibDOLA(address(fed), dolaAmount * 3);
 
-        uint initialVelo = VELO.balanceOf(address(fed));
+        uint initialVelo = VELO.balanceOf(address(treasury));
+
+        vm.startPrank(l1CrossDomainMessenger);
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        vm.stopPrank();
 
         vm.startPrank(l2chair);
         fed.swapAndDeposit(dolaAmount);
@@ -110,18 +126,40 @@ contract VeloFarmerMainnetTest is Test {
         addr[0] = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
         fed.claimRewards(addr);
 
-        assertGt(VELO.balanceOf(address(fed)), initialVelo, "No rewards claimed");
+        assertGt(VELO.balanceOf(address(treasury)), initialVelo, "No rewards claimed");
     }
 
-    function testL2_Deposit(uint amountDola, uint amountUsdc) public {
-        amountDola = bound(amountDola, 10e18, 1_000_000_000e18);
-        amountUsdc = bound(amountUsdc, 10e6, 1_000_000_000e6);
-        gibDOLA(address(fed), amountDola);
-        gibUSDC(address(fed), amountUsdc);
+    function testL2_Deposit_Fails_WhenSlippageGtMaxLiquiditySlippage_USDC_Amount() public {
+        gibDOLA(address(fed), dolaAmount * 2);
+        gibUSDC(address(fed), usdcAmount);
+
+        vm.startPrank(l2chair);
+
+        vm.expectRevert("Router: INSUFFICIENT_A_AMOUNT");
+        fed.depositAll();
+    }
+
+    function testL2_Deposit_Fails_WhenSlippageGtMaxLiquiditySlippage_DOLA_Amount() public {
+        gibDOLA(address(fed), dolaAmount);
+        gibUSDC(address(fed), usdcAmount * 2);
+
+        vm.startPrank(l2chair);
+
+        vm.expectRevert("Router: INSUFFICIENT_B_AMOUNT");
+        fed.depositAll();
+    }
+
+    function testL2_Deposit_Succeeds_WhenSlippageLtMaxLiquiditySlippage() public {
+        gibDOLA(address(fed), dolaAmount * 14 / 10);
+        gibUSDC(address(fed), usdcAmount);
+
+        uint initialPoolTokens = dolaGauge.balanceOf(address(fed));
 
         vm.startPrank(l2chair);
 
         fed.depositAll();
+
+        assertGt(dolaGauge.balanceOf(address(fed)), initialPoolTokens, "depositAll failed");
     }
 
     function testL2_SwapAndDeposit_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {

@@ -10,6 +10,7 @@ contract VeloFarmer {
     address public chair;
     address public l2chair;
     address public gov;
+    address public treasury;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
     uint public maxSlippageBpsLiquidity;
@@ -37,6 +38,7 @@ contract VeloFarmer {
             address dolaAddr_, 
             address usdcAddr_,
             address gov_,
+            address treasury_,
             address bridge_,
             address optiFed_
         )
@@ -46,6 +48,7 @@ contract VeloFarmer {
         USDC = IERC20(usdcAddr_);
         chair = msg.sender;
         gov = gov_;
+        treasury = treasury_;
         bridge = IL2ERC20Bridge(bridge_);
         optiFed = optiFed_;
         
@@ -71,20 +74,26 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Claims all Velodrome VELO token rewards accrued by this contract
+    @notice Claims all VELO token rewards accrued by this contract & transfer all VELO owned by this contract to `treasury`
     */
     function claimVeloRewards() external {
         address[] memory addr = new address[](1);
         addr[0] = veloTokenAddr;
         dolaGauge.getReward(address(this), addr);
+
+        IERC20(addr[0]).transfer(treasury, IERC20(addr[0]).balanceOf(address(this)));
     }
 
     /**
-    @notice Attempts to claim Velodrome token rewards.
+    @notice Attempts to claim token rewards & transfer all reward tokens owned by this contract to `treasury`
     @param addrs Array of token addresses to claim rewards of.
     */
     function claimRewards(address[] calldata addrs) external {
         dolaGauge.getReward(address(this), addrs);
+
+        for (uint i = 0; i < addrs.length; i++) {
+            IERC20(addrs[i]).transfer(treasury, IERC20(addrs[i]).balanceOf(address(this)));
+        }
     }
 
     /**
@@ -178,15 +187,6 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Allows `gov` to transfer tokens on this contract's behalf.
-    */
-    function transferTokens(address token, address to, uint amount) external onlyGov {
-        if (amount > IERC20(token).balanceOf(address(this))) revert NotEnoughTokens();
-
-        require(IERC20(token).transfer(to, amount), "Token transfer failed");
-    }
-
-    /**
     @notice Swap `usdcAmount` of USDC to DOLA through velodrome.
     */
     function swapUSDCtoDOLA(uint usdcAmount) public onlyChair {
@@ -245,6 +245,13 @@ contract VeloFarmer {
     */
     function changeGov(address newGov_) external onlyGov {
         gov = newGov_;
+    }
+
+    /**
+    @notice Method for gov to change treasury address, the address that receives all rewards
+    */
+    function changeTreasury(address newTreasury_) external onlyGov {
+        treasury = newTreasury_;
     }
 
     /**
