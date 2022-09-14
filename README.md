@@ -1,4 +1,5 @@
-##**Introduction to Feds**
+**Introduction to Feds**
+
 Feds are smart contracts used to provide Dola liquidity to various other protocols. Dola is minted into a protocol, after which there must be a reasonable expectation, that the Dola can be pulled out of the same protocol in the future.
 
 A privileged, ideally trust minimized role known as the *Fed Chair* controls market actions taken through feds. The main job of the *Fed Chair* is to defend the Dola peg. This means expanding supply when the peg is above 1$ and contracting supply when the peg is below 1$.
@@ -7,7 +8,8 @@ The *Fed Chair* of each Fed contract is appointed by Inverse DAO on-chain govern
 
 Inverse have historically used two different kinds of Feds: *AMM Feds* and *Lending Market Feds*.
 
-###**Lending Market Feds**
+**Lending Market Feds**
+
 Lending market Feds are the first type of Fed developed by Inverse Finance. They supply Dola liquidity into lending markets, either operated by Inverse Finance, such as Frontier,  or third parties, such as Rari Fuse.
 
 *Fed Chairs* expand Dola supply by providing more liquidity to the lending markets, there by lowering rates and encouraging borrowers to short Dola. This has negative impact on Dola price.
@@ -15,7 +17,8 @@ The opposite can be done to contract supply, by withdrawing liquidity and burnin
 
 There are currently no active *Lending Market Feds*.
 
-###**AMM Feds**
+**AMM Feds**
+
 AMM Feds are the second type of Fed developed by Inverse Finance. They supply Dola liquidity directly into AMMs, selling Dola in return for whichever other token makes up the trading pair. Such Feds make the assumption that the paired tokens are of sound quality.
 
 The *Fed Chair* expands liquidity into the AMM when Dola is above 1$ in price, reducing Dola price by selling half for the paired tokens.
