@@ -76,18 +76,30 @@ contract ConvexFed is CurvePoolAdapter{
         chair = address(0);
     }
 
+    /**
+    @notice Set the maximum acceptable loss when expanding dola supply. Only callable by gov.
+    @param newMaxLossExpansionBps The maximum loss allowed by basis points 1 = 0.01%
+    */
     function setMaxLossExpansionBps(uint newMaxLossExpansionBps) public {
         require(msg.sender == gov, "ONLY GOV");
         require(newMaxLossExpansionBps <= 10000, "Can't have max loss above 100%");
         maxLossExpansionBps = newMaxLossExpansionBps;
     }
 
+    /**
+    @notice Set the maximum acceptable loss when withdrawing dola supply. Only callable by gov.
+    @param newMaxLossWithdrawBps The maximum loss allowed by basis points 1 = 0.01%
+    */
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
         require(msg.sender == gov, "ONLY GOV");
         require(newMaxLossWithdrawBps <= 10000, "Can't have max loss above 100%");
         maxLossWithdrawBps = newMaxLossWithdrawBps;
     }
 
+    /**
+    @notice Set the maximum acceptable loss when Taking Profit from LP tokens. Only callable by gov.
+    @param newMaxLossTakeProfitBps The maximum loss allowed by basis points 1 = 0.01%
+    */
     function setMaxLossTakeProfitBps(uint newMaxLossTakeProfitBps) public {
         require(msg.sender == gov, "ONLY GOV");
         require(newMaxLossTakeProfitBps <= 10000, "Can't have max loss above 100%");
@@ -116,8 +128,7 @@ contract ConvexFed is CurvePoolAdapter{
     Recommended to always broadcast withdrawl transactions(contraction & takeProfits)
     through a frontrun protected RPC like Flashbots RPC.
     @param amountDola The amount of dola tokens to withdraw. Note that more tokens may
-    be withdrawn than requested, as price is calculated by debts to strategies, but strategies
-    may have outperformed price of dola token.
+    be withdrawn than requested.
     */
     function contraction(uint amountDola) public {
         require(msg.sender == chair, "ONLY CHAIR");
