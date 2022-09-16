@@ -18,11 +18,9 @@ interface IMinted is IERC20 {
 
 contract ConvexFedTest is DSTest {
     Vm internal constant vm = Vm(HEVM_ADDRESS);
-    uint public convexPID = 62;
     IConvexBooster public convexBooster = IConvexBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
     IConvexBaseRewardPool public baseRewardPool = IConvexBaseRewardPool(0x835f69e58087E5B6bffEf182fe2bf959Fe253c3c);
     IMetaPool public crvPool = IMetaPool(0xAA5A67c256e27A5d80712c51971408db3370927D);
-    IZapDepositor3pool public zapDepositor = IZapDepositor3pool(0xA79828DF1850E8a3A3064576f380D90aECDD3359);
     ConvexFed public convexFed;
     IMinted public dola = IMinted(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 public crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -38,20 +36,17 @@ contract ConvexFedTest is DSTest {
     function setUp() public {
         convexFed = new ConvexFed(
             address(dola),
-            address(crv),
             address(cvx),
             address(crvPool),
-            address(zapDepositor),
             address(convexBooster),
             address(baseRewardPool),
+            chair,
             gov,
             maxLossExpansionBps,
             maxLossWithdrawBps,
-            maxLossTakeProfitBps,
-            convexPID
+            maxLossTakeProfitBps
         );
         vm.startPrank(gov);
-        convexFed.changeChair(chair);
         dola.addMinter(address(convexFed));
         dola.addMinter(dolaFaucet);
         vm.stopPrank();
