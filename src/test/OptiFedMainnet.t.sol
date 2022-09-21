@@ -13,6 +13,7 @@ contract OptiFedMainnetTest is Test {
     //Tokens
     IDola public DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 public USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    address public threeCrv = 0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490;
     address public optiFedAddress = address(0xA);
     ICurvePool public immutable curvePool = ICurvePool(0xAA5A67c256e27A5d80712c51971408db3370927D);
 
@@ -37,13 +38,13 @@ contract OptiFedMainnetTest is Test {
     function setUp() public {
         vm.startPrank(chair);
 
-        fed = new OptiFed(gov, address(0x69), 1_000_000e18);
+        fed = new OptiFed(gov, chair, address(0x69));
 
         vm.stopPrank();
         vm.startPrank(gov);
 
         fed.setMaxSlippageDolaToUsdc(500);
-        fed.setMaxSlippageUsdcToDola(100);
+        fed.setMaxSlippageUsdcToDola(500);
         DOLA.addMinter(address(fed));
 
         vm.stopPrank();
@@ -74,20 +75,78 @@ contract OptiFedMainnetTest is Test {
         assertLt(prevUsdcBal + estimatedUsdcAmount, USDC.balanceOf(l1optiBridgeAddress) * 1001/1000, "Bridge didn't receive correct amount of USDC");
     }
 
-    function testL1_Expansion_Fails_WhenAmountOverMaxDailyDelta() public {
-        vm.startPrank(chair);
+    function testL1_OptiFedExpansionAndSwap_Fails_IfSlippageRestraintUnmet() public {
+        vm.startPrank(user);
+        uint dolaDumpAmount = 200_000_000e18;
+        gibDOLA(user, dolaDumpAmount);
+        DOLA.approve(address(curvePool), type(uint).max);
+        curvePool.add_liquidity([dolaDumpAmount, 0], 0);
+        vm.stopPrank();
 
-        fed.expansion(fed.availableDailyDelta());
-        vm.expectRevert(DeltaAboveMax.selector);
-        fed.expansion(1e18);
+        vm.startPrank(chair);
+        vm.expectRevert();
+        fed.expansionAndSwap(dolaAmount);
     }
 
-    function testL1_ExpansionAndSwap_Fails_WhenAmountOverMaxDailyDelta() public {
+    function testL1_OptiFedSwapDOLAtoUSDC() public {
         vm.startPrank(chair);
 
-        fed.expansionAndSwap(fed.availableDailyDelta());
-        vm.expectRevert(DeltaAboveMax.selector);
-        fed.expansionAndSwap(1e18);
+        uint prevDolaBal = DOLA.balanceOf(address(fed));
+        uint prevUsdcBal = USDC.balanceOf(address(fed));
+
+        gibDOLA(address(fed), dolaAmount);
+        fed.swapDOLAtoUSDC(dolaAmount);
+
+        uint estimatedUsdcAmount = dolaAmount / 1e12;
+
+        assertEq(prevDolaBal, DOLA.balanceOf(address(fed)), "DOLA didn't leave fed");
+        assertGt(prevUsdcBal + estimatedUsdcAmount * 101 / 100, USDC.balanceOf(address(fed)), "Fed didn't receive correct amount of USDC");
+        assertLt(prevUsdcBal + estimatedUsdcAmount, USDC.balanceOf(address(fed)) * 101/100, "Fed didn't receive correct amount of USDC");
+    }
+
+    function testL1_OptiFedSwapUSDCtoDOLA_Fails_IfSlippageRestraintUnmet() public {
+        vm.startPrank(user);
+        uint threeCrvDumpAmount = 200_000_000e18;
+        gib3crv(user, threeCrvDumpAmount);
+        IERC20(threeCrv).approve(address(curvePool), type(uint).max);
+        curvePool.add_liquidity([0, threeCrvDumpAmount], 0);
+        vm.stopPrank();
+
+        vm.startPrank(chair);
+        gibUSDC(address(fed), usdcAmount);
+        vm.expectRevert();
+        fed.swapUSDCtoDOLA(usdcAmount);
+    }
+
+    function testL1_OptiFedSwapDOLAtoUSDC_Fails_IfSlippageRestraintUnmet() public {
+        vm.startPrank(user);
+        uint dolaDumpAmount = 200_000_000e18;
+        gibDOLA(user, dolaDumpAmount);
+        DOLA.approve(address(curvePool), type(uint).max);
+        curvePool.add_liquidity([dolaDumpAmount, 0], 0);
+        vm.stopPrank();
+
+        vm.startPrank(chair);
+        gibDOLA(address(fed), dolaAmount);
+        vm.expectRevert();
+        fed.swapDOLAtoUSDC(dolaAmount);
+    }
+
+    function testL1_OptiFedSwapUSDCtoDOLA() public {
+        vm.startPrank(chair);
+
+        uint prevDolaBal = DOLA.balanceOf(address(fed));
+        uint prevUsdcBal = USDC.balanceOf(address(fed));
+
+        gibUSDC(address(fed), usdcAmount);
+        USDC.balanceOf(address(fed));
+        fed.swapUSDCtoDOLA(usdcAmount);
+
+        uint estimatedDolaAmount = usdcAmount * 1e12;
+
+        assertEq(prevUsdcBal, USDC.balanceOf(address(fed)), "USDC didn't leave fed");
+        assertGt(prevDolaBal + estimatedDolaAmount * 101 / 100, DOLA.balanceOf(address(fed)), "Fed didn't receive correct amount of DOLA");
+        assertLt(prevDolaBal + estimatedDolaAmount, DOLA.balanceOf(address(fed)) * 101/100, "Fed didn't receive correct amount of DOLA");
     }
 
     function testL1_changeVeloFarmer_fail_whenCalledByNonGov() public {
@@ -111,13 +170,6 @@ contract OptiFedMainnetTest is Test {
         fed.changeGov(user);
     }
 
-    function testL1_setMaxDailyDelta_fail_whenCalledByNonGov() public {
-        vm.startPrank(user);
-
-        vm.expectRevert(OnlyGov.selector);
-        fed.setMaxDailyDelta(1e18);
-    }
-    
     function testL1_setMaxSlippageDolaToUsdc_fail_whenCalledByNonGov() public {
         vm.startPrank(user);
 
@@ -173,7 +225,7 @@ contract OptiFedMainnetTest is Test {
         bytes32 slot;
         assembly {
             mstore(0, _user)
-            mstore(0x20, 0x0)
+            mstore(0x20, 0x6)
             slot := keccak256(0, 0x40)
         }
 
@@ -184,11 +236,22 @@ contract OptiFedMainnetTest is Test {
         bytes32 slot;
         assembly {
             mstore(0, _user)
-            mstore(0x20, 0x0)
+            mstore(0x20, 0x9)
             slot := keccak256(0, 0x40)
         }
 
         vm.store(address(USDC), slot, bytes32(_amount));
+    }
+
+    function gib3crv(address _user, uint _amount) internal {
+        bytes32 slot;
+        assembly {
+            mstore(0, 0x3)
+            mstore(0x20, _user)
+            slot := keccak256(0, 0x40)
+        }
+
+        vm.store(address(threeCrv), slot, bytes32(_amount));
     }
 
     function gibToken(address _token, address _user, uint _amount) public {
