@@ -77,7 +77,7 @@ contract VeloFarmerMainnetTest is Test {
         uint initialVelo = VELO.balanceOf(address(treasury));
 
         vm.startPrank(l1CrossDomainMessenger);
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 5000));
         vm.stopPrank();
 
         vm.startPrank(l2chair);
@@ -96,7 +96,7 @@ contract VeloFarmerMainnetTest is Test {
         uint initialVelo = VELO.balanceOf(address(treasury));
 
         vm.startPrank(l1CrossDomainMessenger);
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 5000));
         vm.stopPrank();
 
         vm.startPrank(l2chair);
@@ -114,7 +114,7 @@ contract VeloFarmerMainnetTest is Test {
         uint initialVelo = VELO.balanceOf(address(treasury));
 
         vm.startPrank(l1CrossDomainMessenger);
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4500));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 5000));
         vm.stopPrank();
 
         vm.startPrank(l2chair);

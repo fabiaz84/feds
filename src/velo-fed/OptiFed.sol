@@ -8,7 +8,7 @@ import "../interfaces/velo/ICurvePool.sol";
 contract OptiFed {
     address public chair;
     address public gov;
-    uint public underlyingSupply;
+    uint public dolaSupply;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
 
@@ -48,46 +48,47 @@ contract OptiFed {
     }
 
     /**
-    @notice Mints `amountUnderlying` of `underlying` tokens, swaps half to USDC, then transfers all to `veloFarmer` through optimism bridge
-    @param amountUnderlying Amount of underlying token to mint
+    @notice Mints `dolaAmount` of DOLA, swaps half to USDC, then transfers all to `veloFarmer` through optimism bridge
+    @param dolaAmount Amount of DOLA to mint
     */
-    function expansionAndSwap(uint amountUnderlying) external {
+    function expansionAndSwap(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
-        underlyingSupply += amountUnderlying;
-        DOLA.mint(address(this), amountUnderlying);
+        dolaSupply += dolaAmount;
+        DOLA.mint(address(this), dolaAmount);
 
-        uint swapAmount = amountUnderlying / 2;
+        uint swapAmount = dolaAmount / 2;
         curvePool.exchange_underlying(0, 2, swapAmount, swapAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI);
 
         optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, DOLA.balanceOf(address(this)), 200_000, "");
         optiBridge.depositERC20To(address(USDC), USDC_OPTI, veloFarmer, USDC.balanceOf(address(this)), 200_000, "");
 
-        emit Expansion(amountUnderlying);
+        emit Expansion(dolaAmount);
     }
 
     /**
     @notice Mints & deposits `amountUnderlying` of `underlying` tokens into Optimism bridge to the `veloFarmer` contract
-    @param amountUnderlying Amount of underlying token to mint & deposit into Velodrome farmer on Optimism
+    @param dolaAmount Amount of underlying token to mint & deposit into Velodrome farmer on Optimism
     */
-    function expansion(uint amountUnderlying) external {
+    function expansion(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
-        underlyingSupply += amountUnderlying;
-        DOLA.mint(address(this), amountUnderlying);
+        dolaSupply += dolaAmount;
+        DOLA.mint(address(this), dolaAmount);
 
         optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, DOLA.balanceOf(address(this)), 200_000, "");
 
-        emit Expansion(amountUnderlying);
+        emit Expansion(dolaAmount);
     }
 
     /**
-    @notice Burns `amountUnderlying` of DOLA held in this contract
+    @notice Burns `dolaAmount` of DOLA held in this contract
+    @param dolaAmount Amount of DOLA to burn
     */
-    function contraction(uint amountUnderlying) public {
+    function contraction(uint dolaAmount) public {
         if (msg.sender != chair) revert OnlyChair();
 
-        _contraction(amountUnderlying);
+        _contraction(dolaAmount);
     }
 
     /**
@@ -101,23 +102,26 @@ contract OptiFed {
 
     /**
     @notice Attempts to contract (burn) `amount` of DOLA. Sends remainder to `gov` if `amount` > DOLA minted by this fed.
+    @param amount Amount of DOLA to contract.
     */
     function _contraction(uint amount) internal{
         if (amount == 0) revert CantBurnZeroDOLA();
-        if(amount > underlyingSupply){
-            DOLA.burn(underlyingSupply);
-            DOLA.transfer(gov, amount - underlyingSupply);
-            emit Contraction(underlyingSupply);
-            underlyingSupply = 0;
+        if(amount > dolaSupply){
+            DOLA.burn(dolaSupply);
+            DOLA.transfer(gov, amount - dolaSupply);
+            emit Contraction(dolaSupply);
+            dolaSupply = 0;
         } else {
             DOLA.burn(amount);
-            underlyingSupply -= amount;
+            dolaSupply -= amount;
             emit Contraction(amount);
         }
     }
 
     /**
-    @notice Swap `usdcAmount` of USDC for DOLA through curve. Will revert if actual slippage > `maxSlippageBpsUsdcToDola`
+    @notice Swap `usdcAmount` of USDC for DOLA through curve.
+    @dev Will revert if actual slippage > `maxSlippageBpsUsdcToDola`
+    @param usdcAmount Amount of USDC to be swapped to DOLA through curve.
     */
     function swapUSDCtoDOLA(uint usdcAmount) external {
         if (msg.sender != chair) revert OnlyChair();
@@ -126,7 +130,9 @@ contract OptiFed {
     }
 
     /**
-    @notice Swap `dolaAmount` of DOLA for USDC through curve. Will revert if actual slippage > `maxSlippageBpsDolaToUsdc`
+    @notice Swap `dolaAmount` of DOLA for USDC through curve.
+    @dev Will revert if actual slippage > `maxSlippageBpsDolaToUsdc`
+    @param dolaAmount Amount of DOLA to be swapped to USDC through curve.
     */
     function swapDOLAtoUSDC(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
@@ -164,6 +170,7 @@ contract OptiFed {
 
     /**
     @notice Method for gov to change gov address
+    @param newGov_ Address to be set as gov
     */
     function changeGov(address newGov_) external {
         if (msg.sender != gov) revert OnlyGov();
@@ -172,6 +179,7 @@ contract OptiFed {
 
     /**
     @notice Method for gov to change the chair
+    @param newChair_ Address to be set as chair
     */
     function changeChair(address newChair_) external {
         if (msg.sender != gov) revert OnlyGov();
@@ -180,6 +188,8 @@ contract OptiFed {
 
     /**
     @notice Method for gov to change the L2 veloFarmer address
+    @dev veloFarmer is the L2 address that receives all bridged DOLA from expansion
+    @param newVeloFarmer_ L2 address to be set as veloFarmer
     */
      function changeVeloFarmer(address newVeloFarmer_) external {
         if (msg.sender != gov) revert OnlyGov();
@@ -188,6 +198,7 @@ contract OptiFed {
 
     /**
     @notice Method for gov to change the curve pool address
+    @param newCurvePool_ Address to be set as curvePool
     */
      function changeCurvePool(address newCurvePool_) external {
         if (msg.sender != gov) revert OnlyGov();

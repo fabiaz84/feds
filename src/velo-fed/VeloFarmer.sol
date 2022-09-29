@@ -98,6 +98,7 @@ contract VeloFarmer {
 
     /**
     @notice Swaps half of `dolaAmount` into USDC through Velodrome. Adds liquidity to DOLA/USDC pool, then deposits LP tokens into DOLA gauge.
+    @param dolaAmount Amount of DOLA used. Half will be swapped to USDC, other half will be supplied as liquidity with the USDC.
     */
     function swapAndDeposit(uint dolaAmount) external onlyChair {
         uint halfDolaAmount = dolaAmount / 2;
@@ -113,6 +114,8 @@ contract VeloFarmer {
 
     /**
     @notice Attempts to deposit `dolaAmount` of DOLA & `usdcAmount` of USDC into Velodrome DOLA/USDC stable pool. Then, deposits LP tokens into gauge.
+    @param dolaAmount Amount of DOLA to be added as liquidity in Velodrome DOLA/USDC pool
+    @param usdcAmount Amount of USDC to be added as liquidity in Velodrome DOLA/USDC pool
     */
     function deposit(uint dolaAmount, uint usdcAmount) public onlyChair {
         uint dolaAmountMin = dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
@@ -131,6 +134,8 @@ contract VeloFarmer {
 
     /**
     @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
+    @param dolaAmount Desired dola value to remove from DOLA/USDC pool. Will attempt to remove 50/50 while allowing for `maxSlippageBpsLiquidity` bps of variance.
+    @return Amount of USDC received from liquidity removal. Used by withdrawLiquidityAndSwap wrapper.
     */
     function withdrawLiquidity(uint dolaAmount) public onlyChair returns (uint) {
         uint liquidity = dolaGauge.balanceOf(address(this));
@@ -149,6 +154,7 @@ contract VeloFarmer {
 
     /**
     @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC and swaps redeemed USDC to DOLA.
+    @param dolaAmount Desired dola value to remove from DOLA/USDC pool. Will attempt to remove 50/50 while allowing for `maxSlippageBpsLiquidity` bps of variance.
     */
     function withdrawLiquidityAndSwapToDOLA(uint dolaAmount) external {
         uint usdcAmount = withdrawLiquidity(dolaAmount);
@@ -158,6 +164,7 @@ contract VeloFarmer {
 
     /**
     @notice Withdraws `dolaAmount` of DOLA to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
+    @param dolaAmount Amount of DOLA to withdraw and send to L1 OptiFed
     */
     function withdrawToL1OptiFed(uint dolaAmount) external onlyChair {
         if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
@@ -167,6 +174,8 @@ contract VeloFarmer {
 
     /**
     @notice Withdraws `dolaAmount` of DOLA & `usdcAmount` of USDC to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
+    @param dolaAmount Amount of DOLA to withdraw and send to L1 OptiFed
+    @param usdcAmount Amount of USDC to withdraw and send to L1 OptiFed
     */
     function withdrawToL1OptiFed(uint dolaAmount, uint usdcAmount) external onlyChair {
         if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
@@ -178,6 +187,9 @@ contract VeloFarmer {
 
     /**
     @notice Withdraws `amount` of `l2Token` to address `to` on L1. Will take 7 days before withdraw is claimable.
+    @param l2Token Address of the L2 token to be withdrawn
+    @param to L1 Address that tokens will be sent to
+    @param amount Amount of the L2 token to be withdrawn
     */
     function withdrawTokensToL1(address l2Token, address to, uint amount) external onlyChair {
         if (amount > IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
@@ -188,6 +200,7 @@ contract VeloFarmer {
 
     /**
     @notice Swap `usdcAmount` of USDC to DOLA through velodrome.
+    @param usdcAmount Amount of USDC to swap to DOLA
     */
     function swapUSDCtoDOLA(uint usdcAmount) public onlyChair {
         uint minOut = usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
@@ -196,6 +209,7 @@ contract VeloFarmer {
 
     /**
     @notice Swap `dolaAmount` of DOLA to USDC through velodrome.
+    @param dolaAmount Amount of DOLA to swap to USDC
     */
     function swapDOLAtoUSDC(uint dolaAmount) public onlyChair { 
         uint minOut = dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
@@ -242,6 +256,8 @@ contract VeloFarmer {
 
     /**
     @notice Method for gov to change gov address
+    @dev gov address should be set to the address of L1 VeloFarmerMessenger if it is being used
+    @param newGov_ L1 address to be set as gov
     */
     function changeGov(address newGov_) external onlyGov {
         gov = newGov_;
@@ -249,6 +265,7 @@ contract VeloFarmer {
 
     /**
     @notice Method for gov to change treasury address, the address that receives all rewards
+    @param newTreasury_ L2 address to be set as treasury
     */
     function changeTreasury(address newTreasury_) external onlyGov {
         treasury = newTreasury_;
@@ -256,6 +273,8 @@ contract VeloFarmer {
 
     /**
     @notice Method for gov to change the chair
+    @dev chair address should be set to the address of L1 VeloFarmerMessenger if it is being used
+    @param newChair_ L1 address to be set as chair
     */
     function changeChair(address newChair_) external onlyGov {
         chair = newChair_;
@@ -263,6 +282,7 @@ contract VeloFarmer {
 
     /**
     @notice Method for gov to change the L2 chair
+    @param newL2Chair_ L2 address to be set as l2chair
     */
     function changeL2Chair(address newL2Chair_) external onlyGov {
         l2chair = newL2Chair_;
@@ -270,6 +290,8 @@ contract VeloFarmer {
 
     /**
     @notice Method for gov to change the L1 optiFed address
+    @dev optiFed is the L1 address that receives all bridged DOLA/USDC from both withdrawToL1OptiFed functions
+    @param newOptiFed_ L1 address to be set as optiFed
     */
     function changeOptiFed(address newOptiFed_) external onlyGov {
         optiFed = newOptiFed_;
