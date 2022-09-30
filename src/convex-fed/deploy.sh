@@ -10,7 +10,7 @@ maxLossWithdraw=1;
 maxLossTakeProfit=1;
 forge create --rpc-url $1 \
     --constructor-args $dola $cvx $crvPool $booster $baseRewardPool $chair $gov $maxLossExpansion $maxLossWithdraw $maxLossTakeProfit\
-    --private-key $3 src/DebtRepayer.sol:DebtRepayer \
+    --private-key $3 src/convex-fed/ConvexFed.sol:ConvexFed \
     --etherscan-api-key $2 \
     --verify
 
