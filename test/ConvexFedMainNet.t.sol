@@ -28,6 +28,7 @@ contract ConvexFedTest is DSTest {
     IERC20 public crv3 = IERC20(0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490);
     address public gov = 0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
     address public chair = address(0xB);
+    address public guardian = address(0xC);
     address public dolaFaucet = address(0xF);
     uint public maxLossExpansionBps = 100;
     uint public maxLossWithdrawBps = 100;
@@ -42,6 +43,7 @@ contract ConvexFedTest is DSTest {
             address(baseRewardPool),
             chair,
             gov,
+            guardian,
             maxLossExpansionBps,
             maxLossWithdrawBps,
             maxLossTakeProfitBps

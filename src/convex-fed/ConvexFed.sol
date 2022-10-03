@@ -15,6 +15,7 @@ contract ConvexFed is CurvePoolAdapter{
     IERC20 public CVX;
     address public chair; // Fed Chair
     address public gov;
+    address public guardian;
     uint public dolaSupply;
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
@@ -31,6 +32,7 @@ contract ConvexFed is CurvePoolAdapter{
             address baseRewardPool_, 
             address chair_,
             address gov_, 
+            address guardian_,
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
             uint maxLossTakeProfitBps_)
@@ -48,6 +50,7 @@ contract ConvexFed is CurvePoolAdapter{
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
         chair = chair_;
         gov = gov_;
+        guardian = guardian_;
     }
 
     /**
@@ -66,6 +69,11 @@ contract ConvexFed is CurvePoolAdapter{
         chair = newChair_;
     }
 
+    function changeGuardian(address newGuardian_) public {
+        require(msg.sender == guardian, "ONLY GOV");
+        guardian = newGuardian_;
+    }
+
     /**
     @notice Method for current chair of the Yearn FED to resign
     */
@@ -81,13 +89,13 @@ contract ConvexFed is CurvePoolAdapter{
     }
 
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
-        require(msg.sender == gov, "ONLY GOV");
+        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV");
         require(newMaxLossWithdrawBps <= 10000, "Can't have max loss above 100%");
         maxLossWithdrawBps = newMaxLossWithdrawBps;
     }
 
     function setMaxLossTakeProfitBps(uint newMaxLossTakeProfitBps) public {
-        require(msg.sender == gov, "ONLY GOV");
+        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV");
         require(newMaxLossTakeProfitBps <= 10000, "Can't have max loss above 100%");
         maxLossTakeProfitBps = newMaxLossTakeProfitBps;   
     }
