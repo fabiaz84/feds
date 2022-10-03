@@ -68,7 +68,9 @@ contract ConvexFed is CurvePoolAdapter{
         require(msg.sender == gov, "ONLY GOV");
         chair = newChair_;
     }
-
+    /**
+    @notice Method for gov to change the guardian
+    */
     function changeGuardian(address newGuardian_) public {
         require(msg.sender == gov, "ONLY GOV");
         guardian = newGuardian_;
@@ -93,7 +95,7 @@ contract ConvexFed is CurvePoolAdapter{
     }
 
     /**
-    @notice Set the maximum acceptable loss when withdrawing dola supply. Only callable by gov.
+    @notice Set the maximum acceptable loss when withdrawing dola supply. Only callable by gov or guardian.
     @param newMaxLossWithdrawBps The maximum loss allowed by basis points 1 = 0.01%
     */
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
