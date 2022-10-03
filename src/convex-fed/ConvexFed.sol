@@ -75,7 +75,7 @@ contract ConvexFed is CurvePoolAdapter{
     }
 
     /**
-    @notice Method for current chair of the Yearn FED to resign
+    @notice Method for current to resign
     */
     function resign() public {
         require(msg.sender == chair, "ONLY CHAIR");
