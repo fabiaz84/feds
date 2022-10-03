@@ -38,13 +38,11 @@ contract OptiFedMainnetTest is Test {
     function setUp() public {
         vm.startPrank(chair);
 
-        fed = new OptiFed(gov, chair, address(0x69));
+        fed = new OptiFed(gov, chair, address(0x69), 500, 500);
 
         vm.stopPrank();
         vm.startPrank(gov);
 
-        fed.setMaxSlippageDolaToUsdc(500);
-        fed.setMaxSlippageUsdcToDola(500);
         DOLA.addMinter(address(fed));
 
         vm.stopPrank();

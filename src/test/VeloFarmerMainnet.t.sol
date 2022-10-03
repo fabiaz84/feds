@@ -35,6 +35,10 @@ contract VeloFarmerMainnetTest is Test {
     uint dolaAmount = 100_000e18;
     uint usdcAmount = 100_000e6;
 
+    uint maxSlippageBpsDolaToUsdc = 500;
+    uint maxSlippageBpsUsdcToDola = 100;
+    uint maxSlippageLiquidity = 2000;
+
     //Feds
     VeloFarmer fed;
 
@@ -55,14 +59,11 @@ contract VeloFarmerMainnetTest is Test {
 
         vm.startPrank(chair);
 
-        fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, treasury, l2optiBridgeAddress, optiFedAddress);
+        fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, chair, treasury, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
 
         vm.stopPrank();
         vm.startPrank(l1CrossDomainMessenger);
 
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", 500));
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", 100));
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 2000));
         relayGovMessage(abi.encodeWithSignature("changeL2Chair(address)", l2chair));
 
         vm.stopPrank();

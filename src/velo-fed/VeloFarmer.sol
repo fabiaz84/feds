@@ -38,19 +38,26 @@ contract VeloFarmer {
             address dolaAddr_, 
             address usdcAddr_,
             address gov_,
+            address chair_,
             address treasury_,
             address bridge_,
-            address optiFed_
+            address optiFed_,
+            uint maxSlippageBpsDolaToUsdc_,
+            uint maxSlippageBpsUsdcToDola_,
+            uint maxSlippageBpsLiquidity_
         )
     {
         router = IRouter(routerAddr_);
         DOLA = IERC20(dolaAddr_);
         USDC = IERC20(usdcAddr_);
-        chair = msg.sender;
+        chair = chair_;
         gov = gov_;
         treasury = treasury_;
         bridge = IL2ERC20Bridge(bridge_);
         optiFed = optiFed_;
+        maxSlippageBpsDolaToUsdc = maxSlippageBpsDolaToUsdc_;
+        maxSlippageBpsUsdcToDola = maxSlippageBpsUsdcToDola_;
+        maxSlippageBpsLiquidity = maxSlippageBpsLiquidity_;
         
         DOLA.approve(routerAddr_, type(uint256).max);
         USDC.approve(routerAddr_, type(uint256).max);

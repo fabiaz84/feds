@@ -35,11 +35,15 @@ contract OptiFed {
     constructor(
             address gov_,
             address chair_,
-            address veloFarmer_)
+            address veloFarmer_,
+            uint maxSlippageBpsDolaToUsdc_,
+            uint maxSlippageBpsUsdcToDola_)
     {
         gov = gov_;
         chair = chair_;
         veloFarmer = veloFarmer_;
+        maxSlippageBpsDolaToUsdc = maxSlippageBpsDolaToUsdc_;
+        maxSlippageBpsUsdcToDola = maxSlippageBpsUsdcToDola_;
 
         DOLA.approve(address(optiBridge), type(uint).max);
         USDC.approve(address(optiBridge), type(uint).max);
