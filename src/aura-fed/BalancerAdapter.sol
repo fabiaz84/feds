@@ -3,15 +3,30 @@ pragma solidity ^0.8.13;
 import "src/interfaces/balancer/IVault.sol";
 import "src/interfaces/IERC20.sol";
 
-interface BPT is IERC20{
+interface IBPT is IERC20{
     function getPoolId() external view returns (bytes32);
+    function getRate() external view returns (uint256);
 }
+
+interface IBABP is IERC20{
+    function getMainToken() external view returns (address);
+    function getWrappedToken() external view returns (address);
+}
+
+interface IBalancerHelper{
+    function queryExit(bytes32 poolId, address sender, address recipient, IVault.ExitPoolRequest) external returns (uint256 bptIn, uint256[] memory amountsOut);
+    function queryJoin(bytes32 poolId, address sender, address recipient, IVault.JoinPoolRequest) external returns (uint256 bptOut, uint256[] memory amountsIn);
+}
+
 
 contract BalancerMetapoolAdapter {
     
     uint constant BPS = 10_000;
     bytes32 immutable poolId;
+    bytes32 bbaUSDpoolId;
     IERC20 immutable dola;
+    IBPT immutable bbAUSD = IBPT(0xA13a9247ea42D743238089903570127DdA72fE44);
+    IBalancerHelper helper = IBalancerHelper(0x5aDDCCa35b7A0D07C74063c48700C8590E87864E);
     IERC20 immutable bpt;
     IVault vault;
     IAsset[] assets = new IAsset[](0);
@@ -19,6 +34,7 @@ contract BalancerMetapoolAdapter {
     
     constructor(bytes32 poolId_, address dola_, address vault_){
         poolId = poolId_;
+        bbaUSDpoolId = bbAUSD.getPoolId();
         dola = IERC20(dola_);
         vault = IVault(vault_);
         (address bptAddress,) = vault.getPool(poolId_);
@@ -67,25 +83,26 @@ contract BalancerMetapoolAdapter {
         return jpr;
     }
 
-    function createExitPoolRequest(uint dolaAmount, uint maxBPTin) internal view returns (IVault.ExitPoolRequest memory){
+    function createExitPoolRequest(uint index, uint dolaAmount, uint maxBPTin) internal view returns (IVault.ExitPoolRequest memory){
         IVault.ExitPoolRequest memory epr;
         epr.assets = assets;
         epr.minAmountsOut = new uint[](assets.length);
-        epr.minAmountsOut[dolaIndex] = dolaAmount;
+        epr.minAmountsOut[index] = dolaAmount;
         epr.userData = getUserDataCustomExit(dolaAmount, maxBPTin);
         epr.toInternalBalance = false;
         return epr;
     }
 
-    function createExitExactPoolRequest(uint bptAmount, uint minDolaOut) internal view returns (IVault.ExitPoolRequest memory){
+    function createExitExactPoolRequest(uint index, uint bptAmount, uint minDolaOut) internal view returns (IVault.ExitPoolRequest memory){
         IVault.ExitPoolRequest memory epr;
         epr.assets = assets;
         epr.minAmountsOut = new uint[](assets.length);
-        epr.minAmountsOut[dolaIndex] = minDolaOut;
+        epr.minAmountsOut[index] = minDolaOut;
         epr.userData = getUserDataExitExact(bptAmount);
         epr.toInternalBalance = false;
         return epr;
     }
+
 
     function _deposit(uint dolaAmount, uint maxSlippage) internal returns(uint){
         //TODO: Make sure slippage is accounted for
@@ -107,21 +124,39 @@ contract BalancerMetapoolAdapter {
 
     function _withdrawAll(uint expectedDolaAmount, uint maxSlippage) internal returns(uint){
         uint toWithdraw = bpt.balanceOf(address(this));
-        vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(expectedDolaAmount, expectedDolaAmount * BPS / maxSlippage));
+        vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(dolaIndex, expectedDolaAmount, expectedDolaAmount * BPS / maxSlippage));
     }
 
-    function bptValue(address bpt) public view returns(uint){
-        //TODO: Add function for taking aTokens into account
-        bytes32 _poolId = BPT(bpt).getPoolId();
-        (IERC20[] memory tokens, uint256[] memory balances, uint lastChange) = vault.getPoolTokens(_poolId);
-        uint totalBalance;
-        for(uint i; i < balances.length; i++){
-            totalBalance += balances[i];
+    function aaveLinearPoolValue(bytes32 poolId, uint amount) internal returns(uint){
+        return helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(0, amount, 0));
+    }
+
+    function bbaUSDValue(uint amount, bool optimistic) internal returns(uint){
+        //TODO: Find better way to ensure that the indexes we're hitting are DAI, USDC and USDT
+        uint out;
+        (address[] aaveLinearTokens,,) = vault.getPoolTokens(bbaUSDpoolId);
+        for(int i; i < 3; i++){
+            uint specificOut = helper.queryExit(bbAUSDpoolId, address(this), address(this), createExitExactPoolRequest(i, amount, 0));
+            uint mainOut = helper.queryExit(IBPT(aaveLinerTokens[i]).getPoolId(), address(this), address(this), createExitExactPoolRequest(0, specificOut, 0));
+            if(optimistic ? mainOut > out : mainOut < out){
+                out = specificOut;
+            }
         }
-        return totalBalance*10**18/IERC20(bpt).totalSupply();
+        return out;
     }
 
-    function bptFromDola(uint dolaAmount) public view returns(uint) {
-        revert("NOT IMPLEMENTED YET");
+    function bptUSDValue(uint amount, bool optimistic) internal returns(uint){
+        uint dolaValue = helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(0, amount, 0));
+        uint bbaUSDAmount = helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(1, amount, 0));
+        uint bbaUsdValue = bbaUSDValue(bbaUSDAmount, optimistic);
+        if(optimistic){
+            return dolaValue > bbaUsdValue ? dolaValue : bbaUsdValue;
+        } else {
+            return dolaValue > bbaUsdValue ? bbaUsdValue : dolaValue;
+        }
+    }
+
+    function bptNeededForDola(uint dolaAmount) public returns(uint) {
+        return vault.queryExit(poolId, address(this), address(this), createExitPoolRequest(0, dolaAmount, 0));
     }
 }
