@@ -70,7 +70,7 @@ contract ConvexFed is CurvePoolAdapter{
     }
 
     function changeGuardian(address newGuardian_) public {
-        require(msg.sender == guardian, "ONLY GOV");
+        require(msg.sender == gov, "ONLY GOV");
         guardian = newGuardian_;
     }
 
