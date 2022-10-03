@@ -107,7 +107,7 @@ contract ConvexFed is CurvePoolAdapter{
     @param newMaxLossTakeProfitBps The maximum loss allowed by basis points 1 = 0.01%
     */
     function setMaxLossTakeProfitBps(uint newMaxLossTakeProfitBps) public {
-        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV");
+        require(msg.sender == gov, "ONLY GOV");
         require(newMaxLossTakeProfitBps <= 10000, "Can't have max loss above 100%");
         maxLossTakeProfitBps = newMaxLossTakeProfitBps;   
     }
