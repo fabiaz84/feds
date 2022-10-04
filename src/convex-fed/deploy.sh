@@ -5,13 +5,13 @@ booster=0xF403C135812408BFbE8713b5A23a04b3D48AAE31;
 baseRewardPool=0x0404d05F3992347d2f0dC3a97bdd147D77C85c1c;
 chair=0x8F97cCA30Dbe80e7a8B462F1dD1a51C32accDfC8;
 gov=0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
-guardian=0xE3eD95e130ad9E15643f5A5f232a3daE980784cd
+guardian=0xE3eD95e130ad9E15643f5A5f232a3daE980784cd;
 maxLossExpansion=10;
 maxLossWithdraw=10;
 maxLossTakeProfit=5;
 forge create --rpc-url $1 \
     --constructor-args $dola $cvx $crvPool $booster $baseRewardPool $chair $gov $guardian $maxLossExpansion $maxLossWithdraw $maxLossTakeProfit\
-    --private-key $3 src/convex-fed/ConvexFed.sol:ConvexFed \
+    --private-key $3 \
     --etherscan-api-key $2 \
-    --verify
+    --verify src/convex-fed/ConvexFed.sol:ConvexFed 
 
