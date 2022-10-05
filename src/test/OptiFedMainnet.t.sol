@@ -161,11 +161,25 @@ contract OptiFedMainnetTest is Test {
         fed.changeChair(user);
     }
 
-    function testL1_changeGov_fail_whenCalledByNonGov() public {
+    function testL1_setPendingGov_fail_whenCalledByNonGov() public {
         vm.startPrank(user);
 
         vm.expectRevert(OnlyGov.selector);
-        fed.changeGov(user);
+        fed.setPendingGov(user);
+    }
+
+    function testL1_govChange() public {
+        vm.startPrank(gov);
+
+        fed.setPendingGov(user);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+
+        fed.claimGov();
+
+        assertEq(fed.gov(), user, "user failed to be set as gov");
+        assertEq(fed.pendingGov(), address(0), "pendingGov failed to be set as 0 address");
     }
 
     function testL1_setMaxSlippageDolaToUsdc_fail_whenCalledByNonGov() public {

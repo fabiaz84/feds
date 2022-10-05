@@ -8,6 +8,7 @@ import "../interfaces/velo/ICurvePool.sol";
 contract OptiFed {
     address public chair;
     address public gov;
+    address public pendingGov;
     uint public dolaSupply;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
@@ -15,11 +16,11 @@ contract OptiFed {
     uint constant PRECISION = 10_000;
     uint public constant DOLA_USDC_CONVERSION_MULTI= 1e12;
 
-    IDola public immutable DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
-    IERC20 public immutable USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    IL1ERC20Bridge public immutable optiBridge = IL1ERC20Bridge(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
-    address public immutable DOLA_OPTI = 0x8aE125E8653821E851F12A49F7765db9a9ce7384;
-    address public immutable USDC_OPTI = 0x7F5c764cBc14f9669B88837ca1490cCa17c31607;
+    IDola public constant DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
+    IERC20 public constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    IL1ERC20Bridge public constant optiBridge = IL1ERC20Bridge(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
+    address public constant DOLA_OPTI = 0x8aE125E8653821E851F12A49F7765db9a9ce7384;
+    address public constant USDC_OPTI = 0x7F5c764cBc14f9669B88837ca1490cCa17c31607;
     ICurvePool public curvePool = ICurvePool(0xAA5A67c256e27A5d80712c51971408db3370927D);
     address public veloFarmer;
 
@@ -27,6 +28,7 @@ contract OptiFed {
     event Contraction(uint amount);
 
     error OnlyGov();
+    error OnlyPendingGov();
     error OnlyChair();
     error CantBurnZeroDOLA();
     error MaxSlippageTooHigh();
@@ -44,11 +46,6 @@ contract OptiFed {
         veloFarmer = veloFarmer_;
         maxSlippageBpsDolaToUsdc = maxSlippageBpsDolaToUsdc_;
         maxSlippageBpsUsdcToDola = maxSlippageBpsUsdcToDola_;
-
-        DOLA.approve(address(optiBridge), type(uint).max);
-        USDC.approve(address(optiBridge), type(uint).max);
-        DOLA.approve(address(curvePool), type(uint).max);
-        USDC.approve(address(curvePool), type(uint).max);
     }
 
     /**
@@ -61,11 +58,14 @@ contract OptiFed {
         dolaSupply += dolaAmount;
         DOLA.mint(address(this), dolaAmount);
 
-        uint swapAmount = dolaAmount / 2;
-        curvePool.exchange_underlying(0, 2, swapAmount, swapAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI);
+        uint halfDolaAmount = dolaAmount / 2;
+        DOLA.approve(address(curvePool), halfDolaAmount);
+        uint usdcAmount = curvePool.exchange_underlying(0, 2, halfDolaAmount, halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI);
 
-        optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, DOLA.balanceOf(address(this)), 200_000, "");
-        optiBridge.depositERC20To(address(USDC), USDC_OPTI, veloFarmer, USDC.balanceOf(address(this)), 200_000, "");
+        DOLA.approve(address(optiBridge), halfDolaAmount);
+        USDC.approve(address(optiBridge), usdcAmount);
+        optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, halfDolaAmount, 200_000, "");
+        optiBridge.depositERC20To(address(USDC), USDC_OPTI, veloFarmer, usdcAmount, 200_000, "");
 
         emit Expansion(dolaAmount);
     }
@@ -80,7 +80,8 @@ contract OptiFed {
         dolaSupply += dolaAmount;
         DOLA.mint(address(this), dolaAmount);
 
-        optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, DOLA.balanceOf(address(this)), 200_000, "");
+        DOLA.approve(address(optiBridge), dolaAmount);
+        optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, dolaAmount, 200_000, "");
 
         emit Expansion(dolaAmount);
     }
@@ -130,6 +131,7 @@ contract OptiFed {
     function swapUSDCtoDOLA(uint usdcAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
+        USDC.approve(address(curvePool), usdcAmount);
         curvePool.exchange_underlying(2, 0, usdcAmount, usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI);
     }
 
@@ -141,6 +143,7 @@ contract OptiFed {
     function swapDOLAtoUSDC(uint dolaAmount) external {
         if (msg.sender != chair) revert OnlyChair();
         
+        DOLA.approve(address(curvePool), dolaAmount);
         curvePool.exchange_underlying(0, 2, dolaAmount, dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI);
     }
 
@@ -173,12 +176,22 @@ contract OptiFed {
     }
 
     /**
-    @notice Method for gov to change gov address
-    @param newGov_ Address to be set as gov
+    @notice Method for `gov` to change `pendingGov` address
+    @dev `pendingGov` will have to call `claimGov` to complete `gov` transfer
+    @param newPendingGov_ Address to be set as `pendingGov`
     */
-    function changeGov(address newGov_) external {
+    function setPendingGov(address newPendingGov_) external {
         if (msg.sender != gov) revert OnlyGov();
-        gov = newGov_;
+        pendingGov = newPendingGov_;
+    }
+
+    /**
+    @notice Method for `pendingGov` to claim `gov` role.
+    */
+    function claimGov() external {
+        if (msg.sender != pendingGov) revert OnlyPendingGov();
+        gov = pendingGov;
+        pendingGov = address(0);
     }
 
     /**

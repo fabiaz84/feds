@@ -9,8 +9,10 @@ import {ICrossDomainMessenger} from "../interfaces/velo/ICrossDomainMessenger.so
 contract VeloFarmer {
     address public chair;
     address public l2chair;
+    address public pendingGov;
     address public gov;
     address public treasury;
+    address public guardian;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
     uint public maxSlippageBpsLiquidity;
@@ -18,18 +20,20 @@ contract VeloFarmer {
     uint public constant DOLA_USDC_CONVERSION_MULTI= 1e12;
     uint public constant PRECISION = 10_000;
 
-    IRouter public immutable router;
-    IGauge public immutable dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
-    IERC20 public immutable DOLA;
-    IERC20 public immutable USDC;
-    IERC20 public immutable LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
-    address public immutable veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
-    ICrossDomainMessenger public immutable ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
-    IL2ERC20Bridge public immutable bridge;
+    IGauge public constant dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
+    IERC20 public constant LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
+    address public constant veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
+    ICrossDomainMessenger public constant ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
+    IRouter public router;
+    IERC20 public DOLA;
+    IERC20 public USDC;
+    IL2ERC20Bridge public bridge;
     address public optiFed;
 
     error OnlyChair();
     error OnlyGov();
+    error OnlyPendingGov();
+    error OnlyGovOrGuardian();
     error MaxSlippageTooHigh();
     error NotEnoughTokens();
     
@@ -40,6 +44,7 @@ contract VeloFarmer {
             address gov_,
             address chair_,
             address treasury_,
+            address guardian_,
             address bridge_,
             address optiFed_,
             uint maxSlippageBpsDolaToUsdc_,
@@ -53,16 +58,12 @@ contract VeloFarmer {
         chair = chair_;
         gov = gov_;
         treasury = treasury_;
+        guardian = guardian_;
         bridge = IL2ERC20Bridge(bridge_);
         optiFed = optiFed_;
         maxSlippageBpsDolaToUsdc = maxSlippageBpsDolaToUsdc_;
         maxSlippageBpsUsdcToDola = maxSlippageBpsUsdcToDola_;
         maxSlippageBpsLiquidity = maxSlippageBpsLiquidity_;
-        
-        DOLA.approve(routerAddr_, type(uint256).max);
-        USDC.approve(routerAddr_, type(uint256).max);
-        LP_TOKEN.approve(address(dolaGauge), type(uint).max);
-        LP_TOKEN.approve(address(router), type(uint).max);
     }
 
     modifier onlyGov() {
@@ -72,11 +73,26 @@ contract VeloFarmer {
         _;
     }
 
+    modifier onlyPendingGov() {
+        if (msg.sender != address(ovmL2CrossDomainMessenger) ||
+            ovmL2CrossDomainMessenger.xDomainMessageSender() != pendingGov
+        ) revert OnlyPendingGov();
+        _;
+    }
+
     modifier onlyChair() {
         if ((msg.sender != address(ovmL2CrossDomainMessenger) ||
             ovmL2CrossDomainMessenger.xDomainMessageSender() != chair) &&
             msg.sender != l2chair
         ) revert OnlyChair();
+        _;
+    }
+
+    modifier onlyGovOrGuardian() {
+        if ((msg.sender != address(ovmL2CrossDomainMessenger) ||
+            (ovmL2CrossDomainMessenger.xDomainMessageSender() != gov) &&
+             ovmL2CrossDomainMessenger.xDomainMessageSender() != guardian)
+        ) revert OnlyGovOrGuardian();
         _;
     }
 
@@ -110,12 +126,16 @@ contract VeloFarmer {
     function swapAndDeposit(uint dolaAmount) external onlyChair {
         uint halfDolaAmount = dolaAmount / 2;
         uint minOut = halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        DOLA.approve(address(router), dolaAmount);
         uint[] memory amounts = router.swapExactTokensForTokensSimple(halfDolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
 
         uint dolaAmountMin = halfDolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         uint usdcAmountMin = dolaAmountMin / DOLA_USDC_CONVERSION_MULTI;
 
+        USDC.approve(address(router), amounts[amounts.length - 1]);
         router.addLiquidity(address(DOLA), address(USDC), true, halfDolaAmount, amounts[amounts.length - 1], dolaAmountMin, usdcAmountMin, address(this), block.timestamp);
+
+        LP_TOKEN.approve(address(dolaGauge), LP_TOKEN.balanceOf(address(this)));
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
     }
 
@@ -128,7 +148,11 @@ contract VeloFarmer {
         uint dolaAmountMin = dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         uint usdcAmountMin = usdcAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
 
+        DOLA.approve(address(router), dolaAmount);
+        USDC.approve(address(router), usdcAmount);
         router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, dolaAmountMin, usdcAmountMin, address(this), block.timestamp);
+        
+        LP_TOKEN.approve(address(dolaGauge), LP_TOKEN.balanceOf(address(this)));
         dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
     }
 
@@ -155,6 +179,7 @@ contract VeloFarmer {
         uint dolaAmountMin = dolaAmount / 2 * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         uint usdcAmountMin = dolaAmountMin / DOLA_USDC_CONVERSION_MULTI;
 
+        LP_TOKEN.approve(address(router), withdrawAmount);
         (, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, withdrawAmount, dolaAmountMin, usdcAmountMin, address(this), block.timestamp);
         return amountUSDC;
     }
@@ -211,6 +236,8 @@ contract VeloFarmer {
     */
     function swapUSDCtoDOLA(uint usdcAmount) public onlyChair {
         uint minOut = usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
+
+        USDC.approve(address(router), usdcAmount);
         router.swapExactTokensForTokensSimple(usdcAmount, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);
     }
 
@@ -220,6 +247,8 @@ contract VeloFarmer {
     */
     function swapDOLAtoUSDC(uint dolaAmount) public onlyChair { 
         uint minOut = dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        
+        DOLA.approve(address(router), dolaAmount);
         router.swapExactTokensForTokensSimple(dolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
     }
 
@@ -238,7 +267,7 @@ contract VeloFarmer {
     @notice Governance only function for setting acceptable slippage when swapping DOLA -> USDC
     @param newMaxSlippageBps The new maximum allowed loss for DOLA -> USDC swaps. 1 = 0.01%
     */
-    function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) onlyGov external {
+    function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) onlyGovOrGuardian external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsDolaToUsdc = newMaxSlippageBps;
     }
@@ -247,7 +276,7 @@ contract VeloFarmer {
     @notice Governance only function for setting acceptable slippage when swapping USDC -> DOLA
     @param newMaxSlippageBps The new maximum allowed loss for USDC -> DOLA swaps. 1 = 0.01%
     */
-    function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) onlyGov external {
+    function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) onlyGovOrGuardian external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsUsdcToDola = newMaxSlippageBps;
     }
@@ -256,18 +285,27 @@ contract VeloFarmer {
     @notice Governance only function for setting acceptable slippage when adding or removing liquidty from DOLA/USDC pool
     @param newMaxSlippageBps The new maximum allowed loss for adding/removing liquidity from DOLA/USDC pool. 1 = 0.01%
     */
-    function setMaxSlippageLiquidity(uint newMaxSlippageBps) onlyGov external {
+    function setMaxSlippageLiquidity(uint newMaxSlippageBps) onlyGovOrGuardian external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsLiquidity = newMaxSlippageBps;
     }
 
     /**
-    @notice Method for gov to change gov address
-    @dev gov address should be set to the address of L1 VeloFarmerMessenger if it is being used
-    @param newGov_ L1 address to be set as gov
+    @notice Method for `gov` to change `pendingGov` address
+    @dev `pendingGov` will have to call `claimGov` to complete `gov` transfer
+    @dev `pendingGov` should be an L1 address
+    @param newPendingGov_ L1 address to be set as `pendingGov`
     */
-    function changeGov(address newGov_) external onlyGov {
-        gov = newGov_;
+    function setPendingGov(address newPendingGov_) onlyGov external {
+        pendingGov = newPendingGov_;
+    }
+
+    /**
+    @notice Method for `pendingGov` to claim `gov` role.
+    */
+    function claimGov() external onlyPendingGov {
+        gov = pendingGov;
+        pendingGov = address(0);
     }
 
     /**
@@ -293,6 +331,14 @@ contract VeloFarmer {
     */
     function changeL2Chair(address newL2Chair_) external onlyGov {
         l2chair = newL2Chair_;
+    }
+
+    /**
+    @notice Method for gov to change the guardian
+    @param guardian_ L1 address to be set as guardian
+    */
+    function changeGuardian(address guardian_) external onlyGov {
+        guardian = guardian_;
     }
 
     /**
