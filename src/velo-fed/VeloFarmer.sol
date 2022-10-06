@@ -347,6 +347,13 @@ contract VeloFarmer {
         pendingGov = newPendingGov_;
     }
 
+    /**
+    @notice Helper function for approximating the amount of token1 that needs to be traded for token2 when adding liquidity.
+    @param pool1Balance The balance of token1 in the Velodrome pair
+    @param pool2Balance The balance of token2 in the Velodrome pair
+    @param balance1 The balance of token1 to add for liquidity
+    @param balance2 The balance of token2 to add for liquidity
+    */
     function optimizeLP(uint pool1Balance, uint pool2Balance, uint balance1, uint balance2) public pure returns(uint balance1ForBalance2, uint balance2ForBalance1){
         uint fee = 45 * 1e14; //0.45%
         uint k1;
