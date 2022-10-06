@@ -19,10 +19,10 @@ contract VeloFarmerMessengerTest is Test {
         messenger = new VeloFarmerMessenger(gov, chair, veloFedPlaceholder);
     }
 
-    function test_onlyGovFunction_fails_whenCalledByNonGov() public {
+    function test_setPendingGovFunction_fails_whenCalledByNonGov() public {
         vm.startPrank(user);
         vm.expectRevert(OnlyGov.selector);
-        messenger.changeGov(user);
+        messenger.setPendingMessengerGov(user);
     }
 
     function test_onlyChairFunction_fails_whenCalledByNonChair() public {

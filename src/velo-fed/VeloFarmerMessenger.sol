@@ -3,10 +3,11 @@ pragma solidity ^0.8.13;
 import "../interfaces/velo/ICrossDomainMessenger.sol";
 
 contract VeloFarmerMessenger {
-    ICrossDomainMessenger immutable crossDomainMessenger = ICrossDomainMessenger(0x25ace71c97B33Cc4729CF772ae268934F7ab5fA1);
+    ICrossDomainMessenger constant crossDomainMessenger = ICrossDomainMessenger(0x25ace71c97B33Cc4729CF772ae268934F7ab5fA1);
     address public veloFed;
 
     address public gov;
+    address public pendingGov;
     address public chair;
 
     constructor(address gov_, address chair_, address veloFed_) {
@@ -20,12 +21,18 @@ contract VeloFarmerMessenger {
         _;
     }
 
+    modifier onlyPendingGov {
+        if (msg.sender != pendingGov) revert OnlyPendingGov();
+        _;
+    }
+
     modifier onlyChair {
         if (msg.sender != chair) revert OnlyChair();
         _;
     }
 
     error OnlyGov();
+    error OnlyPendingGov();
     error OnlyChair();
 
     //Helper functions
@@ -48,8 +55,12 @@ contract VeloFarmerMessenger {
         sendMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", newSlippage_));
     }
 
-    function changeGov(address newGov_) public onlyGov {
-        sendMessage(abi.encodeWithSignature("changeGov(address)", newGov_));
+    function setPendingGov(address newPendingGov_) public onlyGov {
+        sendMessage(abi.encodeWithSignature("setPendingGov(address)", newPendingGov_));
+    }
+
+    function claimGov() public onlyGov {
+        sendMessage(abi.encodeWithSignature("claimGov()"));
     }
 
     function changeTreasury(address newTreasury_) public onlyGov {
@@ -120,8 +131,13 @@ contract VeloFarmerMessenger {
 
     //Gov functions
 
-    function changeMessengerGov(address newGov_) public onlyGov {
-        gov = newGov_;
+    function setPendingMessengerGov(address newPendingGov_) public onlyGov {
+        pendingGov = newPendingGov_;
+    }
+
+    function claimMessengerGov() public onlyPendingGov {
+        gov = pendingGov;
+        pendingGov = address(0);
     }
 
     function changeMessengerChair(address newChair_) public onlyChair {
