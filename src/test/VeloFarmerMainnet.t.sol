@@ -35,9 +35,9 @@ contract VeloFarmerMainnetTest is Test {
     uint dolaAmount = 100_000e18;
     uint usdcAmount = 100_000e6;
 
-    uint maxSlippageBpsDolaToUsdc = 500;
+    uint maxSlippageBpsDolaToUsdc = 200;
     uint maxSlippageBpsUsdcToDola = 100;
-    uint maxSlippageLiquidity = 2000;
+    uint maxSlippageLiquidity = 400;
 
     //Feds
     VeloFarmer fed;
@@ -46,6 +46,7 @@ contract VeloFarmerMainnetTest is Test {
     error OnlyChair();
     error OnlyGovOrGuardian();
     error PercentOutOfRange();
+    error LiquiditySlippageTooHigh();
 
     function relayGovMessage(bytes memory message) public {
         l2CrossDomainMessenger.relayMessage(address(fed), gov, message, nonce++);
@@ -134,29 +135,9 @@ contract VeloFarmerMainnetTest is Test {
         assertGt(VELO.balanceOf(address(treasury)), initialVelo, "No rewards claimed");
     }
 
-    function testL2_Deposit_Fails_WhenSlippageGtMaxLiquiditySlippage_USDC_Amount() public {
-        gibDOLA(address(fed), dolaAmount * 2);
-        gibUSDC(address(fed), usdcAmount);
-
-        vm.startPrank(l2chair);
-
-        vm.expectRevert("Router: INSUFFICIENT_A_AMOUNT");
-        fed.depositAll();
-    }
-
-    function testL2_Deposit_Fails_WhenSlippageGtMaxLiquiditySlippage_DOLA_Amount() public {
-        gibDOLA(address(fed), dolaAmount);
-        gibUSDC(address(fed), usdcAmount * 2);
-
-        vm.startPrank(l2chair);
-
-        vm.expectRevert("Router: INSUFFICIENT_B_AMOUNT");
-        fed.depositAll();
-    }
-
     function testL2_Deposit_Succeeds_WhenSlippageLtMaxLiquiditySlippage() public {
-        gibDOLA(address(fed), dolaAmount * 14 / 10);
-        gibUSDC(address(fed), usdcAmount);
+        gibDOLA(address(fed), dolaAmount);
+        gibUSDC(address(fed), usdcAmount * 5);
 
         uint initialPoolTokens = dolaGauge.balanceOf(address(fed));
 
@@ -210,21 +191,19 @@ contract VeloFarmerMainnetTest is Test {
         fed.swapUSDCtoDOLA(usdcAmount);
     }
 
-    function testL2_Withdraw(uint amountDola) public {
-        amountDola = bound(amountDola, 10_000e18, 1_000_000_000e18);    
-
+    function testL2_Withdraw() public {
         vm.startPrank(l2optiBridgeAddress);
-        DOLA.mint(address(fed), amountDola);
-        USDC.mint(address(fed), amountDola / 1e12);
+        DOLA.mint(address(fed), dolaAmount);
+        USDC.mint(address(fed), dolaAmount / 1e12);
         vm.stopPrank();
 
         vm.startPrank(l1CrossDomainMessenger);
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4000));
+        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 50));
         vm.stopPrank();
 
         vm.startPrank(l2chair);
         fed.depositAll();
-        fed.withdrawLiquidity(amountDola);
+        fed.withdrawLiquidity(dolaAmount);
         
         fed.withdrawToL1OptiFed(DOLA.balanceOf(address(fed)), USDC.balanceOf(address(fed)));
     }
@@ -260,23 +239,19 @@ contract VeloFarmerMainnetTest is Test {
         assertGt(prevUsdc, USDC.balanceOf(address(fed)), "Withdraw to L1 failed");
     }
 
-    function testL2_WithdrawAndSwap(uint amountDola) public {
-        amountDola = bound(amountDola, 10_000e18, 1_000_000e18);    
-
+    function testL2_WithdrawAndSwap() public {
         vm.startPrank(l2optiBridgeAddress);
-        DOLA.mint(address(fed), amountDola / 2);
-        USDC.mint(address(fed), amountDola / 2 / 1e12);
-        vm.stopPrank();
-
-        vm.startPrank(l1CrossDomainMessenger);
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", 4000));
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", 5000));
+        DOLA.mint(address(fed), dolaAmount);
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.depositAll();
+        fed.swapAndDeposit(dolaAmount);
 
-        fed.withdrawLiquidityAndSwapToDOLA(amountDola);
+        uint dolaBal = DOLA.balanceOf(address(fed));
+        uint usdcBal = USDC.balanceOf(address(fed)) * fed.DOLA_USDC_CONVERSION_MULTI();
+        uint withdrawAmount = dolaAmount - dolaBal - usdcBal;
+
+        fed.withdrawLiquidityAndSwapToDOLA(withdrawAmount);
     }
 
     function testL2_onlyChair_fail_whenCalledByBridge_NonChairSender() public {
