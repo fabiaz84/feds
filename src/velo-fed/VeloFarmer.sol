@@ -140,7 +140,7 @@ contract VeloFarmer {
             dolaToDeposit = dolaAmount - dolaForUsdc;
             usdcToDeposit = usdcAmount + amounts[1];
         } else {
-            uint minOut = usdcForDola * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+            uint minOut = usdcForDola * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
             USDC.approve(address(router), usdcForDola);
             uint[] memory amounts = router.swapExactTokensForTokensSimple(usdcForDola, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);       
             dolaToDeposit = dolaAmount + amounts[1];
