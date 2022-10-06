@@ -121,16 +121,40 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Swaps half of `dolaAmount` into USDC through Velodrome. Adds liquidity to DOLA/USDC pool, then deposits LP tokens into DOLA gauge.
-    @param dolaAmount Amount of DOLA used. Half will be swapped to USDC, other half will be supplied as liquidity with the USDC.
+    @notice Swaps the majority token for the minority token in the DOLA/USDC Velodrome pool, and then adds liquidity to DOLA/USDC pool, then deposits LP tokens into DOLA gauge.
+    @dev The optimizeLP function is not precise, and will likely leave some dust amount of tokens in the contract.
+    @param dolaAmount Amount of DOLA to be used. Some may be sold for USDC if there's an excess of DOLA in the pair.
+    @param usdcAmount Amount of USDC to be used. Some may be sold for DOLA if there's an excess of USDC in the pair.
     */
-    function swapAndDeposit(uint dolaAmount) external onlyChair {
-        uint halfDolaAmount = dolaAmount / 2;
-        uint minOut = halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
-        DOLA.approve(address(router), dolaAmount);
-        uint[] memory amounts = router.swapExactTokensForTokensSimple(halfDolaAmount, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
-
-        deposit(halfDolaAmount, amounts[amounts.length - 1]);
+    function swapAndDeposit(uint dolaAmount, uint usdcAmount) public onlyChair {
+        address pair = router.pairFor(address(DOLA), address(USDC), true);
+        uint dolaToDeposit;
+        uint usdcToDeposit;
+        //1e12 magic number is to adjust for USDC 6 decimals precision
+        (uint dolaForUsdc, uint usdcForDola) = optimizeLP(DOLA.balanceOf(pair), USDC.balanceOf(pair)*1e12, dolaAmount, usdcAmount);
+        usdcForDola = usdcForDola / 1e12;
+        if(usdcForDola == 0){
+            uint minOut = dolaForUsdc * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+            DOLA.approve(address(router), dolaForUsdc);
+            uint[] memory amounts = router.swapExactTokensForTokensSimple(dolaForUsdc, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
+            dolaToDeposit = dolaAmount - dolaForUsdc;
+            usdcToDeposit = usdcAmount + amounts[1];
+        } else {
+            uint minOut = usdcForDola * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+            USDC.approve(address(router), usdcForDola);
+            uint[] memory amounts = router.swapExactTokensForTokensSimple(usdcForDola, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);       
+            dolaToDeposit = dolaAmount + amounts[1];
+            usdcToDeposit = usdcAmount - usdcForDola;
+        }
+        USDC.approve(address(router), usdcToDeposit);
+        DOLA.approve(address(router), dolaToDeposit);
+        deposit(dolaToDeposit, usdcToDeposit);
+    }
+    /**
+    @notice Attemps to add all tokens in the Fed as liquidity before depositing to the DOLA gauge. It is likely that some dust amount will be left.
+    */
+    function swapAndDepositAll() public onlyChair {
+        swapAndDeposit(DOLA.balanceOf(address(this)), USDC.balanceOf(address(this)));
     }
 
     /**
@@ -321,6 +345,21 @@ contract VeloFarmer {
     */
     function setPendingGov(address newPendingGov_) onlyGov external {
         pendingGov = newPendingGov_;
+    }
+
+    function optimizeLP(uint pool1Balance, uint pool2Balance, uint balance1, uint balance2) public pure returns(uint balance1ForBalance2, uint balance2ForBalance1){
+        uint fee = 45 * 1e14; //0.45%
+        uint k1;
+        uint k2 = pool1Balance + pool2Balance;
+        if(pool2Balance * balance1 > pool1Balance * balance2){
+            k1 = pool2Balance * balance1 - pool1Balance * balance2;
+            balance1ForBalance2 = k1 * (1e18 - fee) / 1e18 / k2;
+            balance2ForBalance1 = 0;
+        } else {
+            k1 = pool1Balance * balance2 - pool2Balance * balance1;
+            balance1ForBalance2 = 0;           
+            balance2ForBalance1 = k1 * (1e18 - fee) / 1e18 / k2;
+        }
     }
 
     /**

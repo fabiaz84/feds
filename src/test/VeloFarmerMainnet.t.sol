@@ -66,6 +66,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.startPrank(chair);
 
         fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
+        vm.makePersistent(address(fed));
 
         vm.stopPrank();
         vm.startPrank(l1CrossDomainMessenger);
@@ -107,7 +108,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount);
+        fed.swapAndDeposit(dolaAmount, 0);
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + (10_000 * 60));
         fed.claimVeloRewards();
@@ -125,7 +126,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount);
+        fed.swapAndDeposit(dolaAmount, 0);
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + (10_000 * 60));
         address[] memory addr = new address[](1);
@@ -157,7 +158,7 @@ contract VeloFarmerMainnetTest is Test {
 
         vm.startPrank(l2chair);
         vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
-        fed.swapAndDeposit(dolaAmount);
+        fed.swapAndDeposit(dolaAmount, 0);
     }
 
     function testL2_SwapDolaToUsdc_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
@@ -245,7 +246,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount);
+        fed.swapAndDeposit(dolaAmount, 0);
 
         uint dolaBal = DOLA.balanceOf(address(fed));
         uint usdcBal = USDC.balanceOf(address(fed)) * fed.DOLA_USDC_CONVERSION_MULTI();
