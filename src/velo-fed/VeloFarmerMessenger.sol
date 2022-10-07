@@ -8,16 +8,23 @@ contract VeloFarmerMessenger {
 
     address public gov;
     address public pendingGov;
+    address public guardian;
     address public chair;
 
-    constructor(address gov_, address chair_, address veloFed_) {
+    constructor(address gov_, address chair_, address guardian_, address veloFed_) {
         gov = gov_;
         chair = chair_;
+        guardian = guardian_;
         veloFed = veloFed_;
     } 
 
     modifier onlyGov {
         if (msg.sender != gov) revert OnlyGov();
+        _;
+    }
+
+    modifier onlyGovOrGuardian {
+        if (msg.sender != gov || msg.sender != guardian) revert OnlyGov();
         _;
     }
 
@@ -32,6 +39,7 @@ contract VeloFarmerMessenger {
     }
 
     error OnlyGov();
+    error OnlyGovOrGuardian();
     error OnlyPendingGov();
     error OnlyChair();
 
@@ -43,15 +51,15 @@ contract VeloFarmerMessenger {
 
     //Gov Messaging functions
 
-    function setMaxSlippageDolaToUsdc(uint newSlippage_) public onlyGov {
+    function setMaxSlippageDolaToUsdc(uint newSlippage_) public onlyGovOrGuardian {
         sendMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", newSlippage_));
     }
 
-    function setMaxSlippageUsdcToDola(uint newSlippage_) public onlyGov {
+    function setMaxSlippageUsdcToDola(uint newSlippage_) public onlyGovOrGuardian {
         sendMessage(abi.encodeWithSignature("setMaxSlippageUsdcToDola(uint256)", newSlippage_));
     }
 
-    function setMaxSlippageLiquidity(uint newSlippage_) public onlyGov {
+    function setMaxSlippageLiquidity(uint newSlippage_) public onlyGovOrGuardian {
         sendMessage(abi.encodeWithSignature("setMaxSlippageLiquidity(uint256)", newSlippage_));
     }
 

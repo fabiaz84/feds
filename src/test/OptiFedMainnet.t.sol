@@ -28,8 +28,8 @@ contract OptiFedMainnetTest is Test {
     address gov = 0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
 
     //Numbas
-    uint dolaAmount = 2_000_000e18;
-    uint usdcAmount = 2_000_000e6;
+    uint dolaAmount = 1_000_00e18;
+    uint usdcAmount = 1_000_00e6;
 
     //Feds
     OptiFed fed;
@@ -41,7 +41,7 @@ contract OptiFedMainnetTest is Test {
     function setUp() public {
         vm.startPrank(chair);
 
-        fed = new OptiFed(gov, chair, address(0x69), 500, 500);
+        fed = new OptiFed(gov, chair, address(0x69), 25, 10);
 
         vm.stopPrank();
         vm.startPrank(gov);

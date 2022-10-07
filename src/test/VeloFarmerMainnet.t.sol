@@ -35,9 +35,9 @@ contract VeloFarmerMainnetTest is Test {
     uint dolaAmount = 100_000e18;
     uint usdcAmount = 100_000e6;
 
-    uint maxSlippageBpsDolaToUsdc = 200;
-    uint maxSlippageBpsUsdcToDola = 100;
-    uint maxSlippageLiquidity = 400;
+    uint maxSlippageBpsDolaToUsdc = 100;
+    uint maxSlippageBpsUsdcToDola = 20;
+    uint maxSlippageLiquidity = 20;
 
     //Feds
     VeloFarmer fed;
@@ -138,7 +138,7 @@ contract VeloFarmerMainnetTest is Test {
 
     function testL2_Deposit_Succeeds_WhenSlippageLtMaxLiquiditySlippage() public {
         gibDOLA(address(fed), dolaAmount);
-        gibUSDC(address(fed), usdcAmount * 5);
+        gibUSDC(address(fed), usdcAmount * 2);
 
         uint initialPoolTokens = dolaGauge.balanceOf(address(fed));
 
