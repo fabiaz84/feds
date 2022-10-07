@@ -6,7 +6,6 @@ pragma solidity ^0.8.0;
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
  */
-
 interface IERC20 {
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
@@ -28,13 +27,15 @@ interface IERC20 {
     function totalSupply() external view returns (uint256);
 
     /**
+
      * @dev Returns the decimal points used by the token.
      */
     function decimals() external view returns (uint8);
 
     /**
-     * @dev Returns the amount of tokens owned by `account`.
-     */
+     
+    * @dev Returns the amount of tokens owned by `account`.
+    */
     function balanceOf(address account) external view returns (uint256);
 
     /**
