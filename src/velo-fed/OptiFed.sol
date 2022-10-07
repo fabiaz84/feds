@@ -21,7 +21,7 @@ contract OptiFed {
     IL1ERC20Bridge public constant optiBridge = IL1ERC20Bridge(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
     address public constant DOLA_OPTI = 0x8aE125E8653821E851F12A49F7765db9a9ce7384;
     address public constant USDC_OPTI = 0x7F5c764cBc14f9669B88837ca1490cCa17c31607;
-    ICurvePool public curvePool = ICurvePool(0xAA5A67c256e27A5d80712c51971408db3370927D);
+    ICurvePool public curvePool = ICurvePool(0xE57180685E3348589E9521aa53Af0BCD497E884d);
     address public veloFarmer;
 
     event Expansion(uint amount);
@@ -33,6 +33,7 @@ contract OptiFed {
     error CantBurnZeroDOLA();
     error MaxSlippageTooHigh();
     error DeltaAboveMax();
+    error SwapMoreDolaThanMinted();
 
     constructor(
             address gov_,
@@ -49,22 +50,24 @@ contract OptiFed {
     }
 
     /**
-    @notice Mints `dolaAmount` of DOLA, swaps half to USDC, then transfers all to `veloFarmer` through optimism bridge
+    @notice Mints `dolaAmount` of DOLA, swaps `dolaToSwap` of DOLA to USDC, then transfers all to `veloFarmer` through optimism bridge
     @param dolaAmount Amount of DOLA to mint
+    @param dolaToSwap Amount of DOLA to swap for USDC
     */
-    function expansionAndSwap(uint dolaAmount) external {
+    function expansionAndSwap(uint dolaAmount, uint dolaToSwap) external {
         if (msg.sender != chair) revert OnlyChair();
+        if (dolaToSwap > dolaAmount) revert SwapMoreDolaThanMinted();
         
         dolaSupply += dolaAmount;
         DOLA.mint(address(this), dolaAmount);
 
-        uint halfDolaAmount = dolaAmount / 2;
-        DOLA.approve(address(curvePool), halfDolaAmount);
-        uint usdcAmount = curvePool.exchange_underlying(0, 2, halfDolaAmount, halfDolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI);
+        DOLA.approve(address(curvePool), dolaToSwap);
+        uint usdcAmount = curvePool.exchange_underlying(0, 2, dolaToSwap, dolaToSwap * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI);
 
-        DOLA.approve(address(optiBridge), halfDolaAmount);
+        uint dolaToBridge = dolaAmount - dolaToSwap;
+        DOLA.approve(address(optiBridge), dolaToBridge);
         USDC.approve(address(optiBridge), usdcAmount);
-        optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, halfDolaAmount, 200_000, "");
+        optiBridge.depositERC20To(address(DOLA), DOLA_OPTI, veloFarmer, dolaToBridge, 200_000, "");
         optiBridge.depositERC20To(address(USDC), USDC_OPTI, veloFarmer, usdcAmount, 200_000, "");
 
         emit Expansion(dolaAmount);

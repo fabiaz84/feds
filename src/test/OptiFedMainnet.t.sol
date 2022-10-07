@@ -14,8 +14,11 @@ contract OptiFedMainnetTest is Test {
     IDola public DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 public USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address public threeCrv = 0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490;
+    address public crvFrax = 0x3175Df0976dFA876431C2E9eE6Bc45b65d3473CC;
     address public optiFedAddress = address(0xA);
-    ICurvePool public immutable curvePool = ICurvePool(0xAA5A67c256e27A5d80712c51971408db3370927D);
+    ICurvePool public immutable curvePool = ICurvePool(0xE57180685E3348589E9521aa53Af0BCD497E884d);
+
+    address public threeCrvDolaPool = 0xAA5A67c256e27A5d80712c51971408db3370927D;
 
     address l1optiBridgeAddress = 0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1;
 
@@ -25,8 +28,8 @@ contract OptiFedMainnetTest is Test {
     address gov = 0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
 
     //Numbas
-    uint dolaAmount = 100_000e18;
-    uint usdcAmount = 100_000e6;
+    uint dolaAmount = 2_000_000e18;
+    uint usdcAmount = 2_000_000e6;
 
     //Feds
     OptiFed fed;
@@ -58,17 +61,36 @@ contract OptiFedMainnetTest is Test {
         assertEq(prevBal + dolaAmount, DOLA.balanceOf(l1optiBridgeAddress));
     }
 
-    function testL1_OptiFedExpansionAndSwap() public {
+    function testL1_OptiFedExpansionAndSwap_Half() public {
         vm.startPrank(chair);
 
         uint prevDolaBal = DOLA.balanceOf(l1optiBridgeAddress);
         uint prevUsdcBal = USDC.balanceOf(l1optiBridgeAddress);
 
-        fed.expansionAndSwap(dolaAmount);
+        fed.expansionAndSwap(dolaAmount, dolaAmount / 2);
 
         uint estimatedUsdcAmount = dolaAmount / 2 / 1e12;
 
         assertEq(prevDolaBal + dolaAmount / 2, DOLA.balanceOf(l1optiBridgeAddress), "Bridge didn't receive correct amount of DOLA");
+        assertGt(prevUsdcBal + estimatedUsdcAmount * 1001 / 1000, USDC.balanceOf(l1optiBridgeAddress), "Bridge didn't receive correct amount of USDC");
+        assertLt(prevUsdcBal + estimatedUsdcAmount, USDC.balanceOf(l1optiBridgeAddress) * 1001/1000, "Bridge didn't receive correct amount of USDC");
+    }
+
+    function testL1_OptiFedExpansionAndSwap(uint8 multi) public {
+        uint256 multiplier = bound(uint(multi), 1, 10);
+        uint dolaToSwap = dolaAmount * multiplier / 10;
+        uint dolaToBridge = dolaAmount - dolaToSwap;
+
+        vm.startPrank(chair);
+
+        uint prevDolaBal = DOLA.balanceOf(l1optiBridgeAddress);
+        uint prevUsdcBal = USDC.balanceOf(l1optiBridgeAddress);
+
+        fed.expansionAndSwap(dolaAmount, dolaToSwap);
+
+        uint estimatedUsdcAmount = dolaToSwap / 1e12;
+
+        assertEq(prevDolaBal + dolaToBridge, DOLA.balanceOf(l1optiBridgeAddress), "Bridge didn't receive correct amount of DOLA");
         assertGt(prevUsdcBal + estimatedUsdcAmount * 1001 / 1000, USDC.balanceOf(l1optiBridgeAddress), "Bridge didn't receive correct amount of USDC");
         assertLt(prevUsdcBal + estimatedUsdcAmount, USDC.balanceOf(l1optiBridgeAddress) * 1001/1000, "Bridge didn't receive correct amount of USDC");
     }
@@ -83,7 +105,7 @@ contract OptiFedMainnetTest is Test {
 
         vm.startPrank(chair);
         vm.expectRevert();
-        fed.expansionAndSwap(dolaAmount);
+        fed.expansionAndSwap(dolaAmount, dolaAmount / 2);
     }
 
     function testL1_OptiFedSwapDOLAtoUSDC() public {
@@ -102,12 +124,33 @@ contract OptiFedMainnetTest is Test {
         assertLt(prevUsdcBal + estimatedUsdcAmount, USDC.balanceOf(address(fed)) * 101/100, "Fed didn't receive correct amount of USDC");
     }
 
-    function testL1_OptiFedSwapUSDCtoDOLA_Fails_IfSlippageRestraintUnmet() public {
+    function testL1_OptiFedSwapUSDCtoDOLA_Fails_IfSlippageRestraintUnmet_crvFrax() public {
+        uint dumpAmount = 200_000_000e18;
+        gibCrvFrax(user, dumpAmount);
+
         vm.startPrank(user);
-        uint threeCrvDumpAmount = 200_000_000e18;
-        gib3crv(user, threeCrvDumpAmount);
-        IERC20(threeCrv).approve(address(curvePool), type(uint).max);
-        curvePool.add_liquidity([0, threeCrvDumpAmount], 0);
+        IERC20(crvFrax).approve(address(curvePool), type(uint).max);
+        IERC20(crvFrax).balanceOf(user);
+        curvePool.add_liquidity([0, dumpAmount], 0);
+        vm.stopPrank();
+
+        vm.startPrank(chair);
+        gibUSDC(address(fed), usdcAmount);
+        vm.expectRevert();
+        fed.swapUSDCtoDOLA(usdcAmount);
+    }
+
+    function testL1_OptiFedSwapUSDCtoDOLA_Fails_IfSlippageRestraintUnmet_threeCrv() public {
+        uint dumpAmount = 200_000_000e18;
+        gib3crv(user, dumpAmount);
+
+        vm.startPrank(gov);
+        fed.changeCurvePool(threeCrvDolaPool);
+        vm.stopPrank();
+        
+        vm.startPrank(user);
+        IERC20(threeCrv).approve(address(threeCrvDolaPool), type(uint).max);
+        ICurvePool(threeCrvDolaPool).add_liquidity([0, dumpAmount], 0);
         vm.stopPrank();
 
         vm.startPrank(chair);
@@ -264,6 +307,13 @@ contract OptiFedMainnetTest is Test {
         }
 
         vm.store(address(threeCrv), slot, bytes32(_amount));
+    }
+
+    function gibCrvFrax(address _user, uint _amount) internal {
+        vm.stopPrank();
+        vm.startPrank(0xDcEF968d416a41Cdac0ED8702fAC8128A64241A2);
+        IERC20(crvFrax).mint(_user, _amount);
+        vm.stopPrank();
     }
 
     function gibToken(address _token, address _user, uint _amount) public {
