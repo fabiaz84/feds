@@ -131,7 +131,7 @@ contract VeloFarmer {
         uint dolaToDeposit;
         uint usdcToDeposit;
         //1e12 magic number is to adjust for USDC 6 decimals precision
-        (uint dolaForUsdc, uint usdcForDola) = optimizeLP(DOLA.balanceOf(pair), USDC.balanceOf(pair)*1e12, dolaAmount, usdcAmount);
+        (uint dolaForUsdc, uint usdcForDola) = optimizeLP(DOLA.balanceOf(pair), USDC.balanceOf(pair)*1e12, dolaAmount, usdcAmount*1e12);
         usdcForDola = usdcForDola / 1e12;
         if(usdcForDola == 0){
             uint minOut = dolaForUsdc * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
@@ -355,7 +355,7 @@ contract VeloFarmer {
     @param balance2 The balance of token2 to add for liquidity
     */
     function optimizeLP(uint pool1Balance, uint pool2Balance, uint balance1, uint balance2) public pure returns(uint balance1ForBalance2, uint balance2ForBalance1){
-        uint fee = 45 * 1e14; //0.45%
+        uint fee = 2 * 1e14; //0.02%
         uint k1;
         uint k2 = pool1Balance + pool2Balance;
         if(pool2Balance * balance1 > pool1Balance * balance2){

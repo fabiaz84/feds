@@ -255,6 +255,70 @@ contract VeloFarmerMainnetTest is Test {
         fed.withdrawLiquidityAndSwapToDOLA(withdrawAmount);
     }
 
+    function testL2_SwapAndDeposit_BothCoins() public {
+        vm.startPrank(l2optiBridgeAddress);
+        DOLA.mint(address(fed), dolaAmount);
+        gibUSDC(address(fed), usdcAmount * 3);
+        vm.stopPrank();
+
+        uint dolaBal = DOLA.balanceOf(address(fed));
+        uint usdcBal = USDC.balanceOf(address(fed));
+
+        emit log_named_uint("dola bal", dolaBal);
+        emit log_named_uint("usdc bal", usdcBal);
+
+        vm.startPrank(l2chair);
+        fed.swapAndDeposit(dolaAmount, usdcAmount * 3);
+
+        dolaBal = DOLA.balanceOf(address(fed));
+        usdcBal = USDC.balanceOf(address(fed));
+
+        emit log_named_uint("dola bal", dolaBal);
+        emit log_named_uint("usdc bal", usdcBal);
+    }
+
+    function testL2_SwapAndDeposit_USDC() public {
+        vm.startPrank(l2optiBridgeAddress);
+        gibUSDC(address(fed), usdcAmount);
+        vm.stopPrank();
+
+        uint dolaBal = DOLA.balanceOf(address(fed));
+        uint usdcBal = USDC.balanceOf(address(fed));
+
+        emit log_named_uint("dola bal", dolaBal);
+        emit log_named_uint("usdc bal", usdcBal);
+
+        vm.startPrank(l2chair);
+        fed.swapAndDeposit(0, usdcAmount);
+
+        dolaBal = DOLA.balanceOf(address(fed));
+        usdcBal = USDC.balanceOf(address(fed));
+
+        emit log_named_uint("dola bal", dolaBal);
+        emit log_named_uint("usdc bal", usdcBal);
+    }
+
+    function testL2_SwapAndDeposit_DOLA() public {
+        vm.startPrank(l2optiBridgeAddress);
+        DOLA.mint(address(fed), dolaAmount);
+        vm.stopPrank();
+
+        uint dolaBal = DOLA.balanceOf(address(fed));
+        uint usdcBal = USDC.balanceOf(address(fed));
+
+        emit log_named_uint("dola bal", dolaBal);
+        emit log_named_uint("usdc bal", usdcBal);
+
+        vm.startPrank(l2chair);
+        fed.swapAndDeposit(dolaAmount, 0);
+
+        dolaBal = DOLA.balanceOf(address(fed));
+        usdcBal = USDC.balanceOf(address(fed));
+
+        emit log_named_uint("dola bal", dolaBal);
+        emit log_named_uint("usdc bal", usdcBal);
+    }
+
     function testL2_onlyChair_fail_whenCalledByBridge_NonChairSender() public {
         vm.startPrank(l1CrossDomainMessenger);
 
