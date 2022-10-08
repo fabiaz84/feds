@@ -100,6 +100,7 @@ contract VeloFarmerMainnetTest is Test {
 
     function testL2_SwapAndClaimVeloRewards() public {
         gibDOLA(address(fed), dolaAmount * 3);
+        gibUSDC(address(fed), usdcAmount * 3);
 
         uint initialVelo = VELO.balanceOf(address(treasury));
 
@@ -108,7 +109,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount, 0);
+        fed.deposit(dolaAmount, usdcAmount);
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + (10_000 * 60));
         fed.claimVeloRewards();
@@ -118,6 +119,7 @@ contract VeloFarmerMainnetTest is Test {
 
     function testL2_SwapAndClaimRewards() public {
         gibDOLA(address(fed), dolaAmount * 3);
+        gibUSDC(address(fed), usdcAmount * 3);
 
         uint initialVelo = VELO.balanceOf(address(treasury));
 
@@ -126,7 +128,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount, 0);
+        fed.depositAll();
         vm.roll(block.number + 10000);
         vm.warp(block.timestamp + (10_000 * 60));
         address[] memory addr = new address[](1);
@@ -147,18 +149,6 @@ contract VeloFarmerMainnetTest is Test {
         fed.depositAll();
 
         assertGt(dolaGauge.balanceOf(address(fed)), initialPoolTokens, "depositAll failed");
-    }
-
-    function testL2_SwapAndDeposit_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
-        gibDOLA(address(fed), dolaAmount * 3);
-
-        vm.startPrank(l1CrossDomainMessenger);
-        relayGovMessage(abi.encodeWithSignature("setMaxSlippageDolaToUsdc(uint256)", 100));
-        vm.stopPrank();
-
-        vm.startPrank(l2chair);
-        vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
-        fed.swapAndDeposit(dolaAmount, 0);
     }
 
     function testL2_SwapDolaToUsdc_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
@@ -243,80 +233,17 @@ contract VeloFarmerMainnetTest is Test {
     function testL2_WithdrawAndSwap() public {
         vm.startPrank(l2optiBridgeAddress);
         DOLA.mint(address(fed), dolaAmount);
+        gibUSDC(address(fed), usdcAmount);
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount, 0);
+        fed.depositAll();
 
         uint dolaBal = DOLA.balanceOf(address(fed));
         uint usdcBal = USDC.balanceOf(address(fed)) * fed.DOLA_USDC_CONVERSION_MULTI();
         uint withdrawAmount = dolaAmount - dolaBal - usdcBal;
 
         fed.withdrawLiquidityAndSwapToDOLA(withdrawAmount);
-    }
-
-    function testL2_SwapAndDeposit_BothCoins() public {
-        vm.startPrank(l2optiBridgeAddress);
-        DOLA.mint(address(fed), dolaAmount);
-        gibUSDC(address(fed), usdcAmount * 3);
-        vm.stopPrank();
-
-        uint dolaBal = DOLA.balanceOf(address(fed));
-        uint usdcBal = USDC.balanceOf(address(fed));
-
-        emit log_named_uint("dola bal", dolaBal);
-        emit log_named_uint("usdc bal", usdcBal);
-
-        vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount, usdcAmount * 3);
-
-        dolaBal = DOLA.balanceOf(address(fed));
-        usdcBal = USDC.balanceOf(address(fed));
-
-        emit log_named_uint("dola bal", dolaBal);
-        emit log_named_uint("usdc bal", usdcBal);
-    }
-
-    function testL2_SwapAndDeposit_USDC() public {
-        vm.startPrank(l2optiBridgeAddress);
-        gibUSDC(address(fed), usdcAmount);
-        vm.stopPrank();
-
-        uint dolaBal = DOLA.balanceOf(address(fed));
-        uint usdcBal = USDC.balanceOf(address(fed));
-
-        emit log_named_uint("dola bal", dolaBal);
-        emit log_named_uint("usdc bal", usdcBal);
-
-        vm.startPrank(l2chair);
-        fed.swapAndDeposit(0, usdcAmount);
-
-        dolaBal = DOLA.balanceOf(address(fed));
-        usdcBal = USDC.balanceOf(address(fed));
-
-        emit log_named_uint("dola bal", dolaBal);
-        emit log_named_uint("usdc bal", usdcBal);
-    }
-
-    function testL2_SwapAndDeposit_DOLA() public {
-        vm.startPrank(l2optiBridgeAddress);
-        DOLA.mint(address(fed), dolaAmount);
-        vm.stopPrank();
-
-        uint dolaBal = DOLA.balanceOf(address(fed));
-        uint usdcBal = USDC.balanceOf(address(fed));
-
-        emit log_named_uint("dola bal", dolaBal);
-        emit log_named_uint("usdc bal", usdcBal);
-
-        vm.startPrank(l2chair);
-        fed.swapAndDeposit(dolaAmount, 0);
-
-        dolaBal = DOLA.balanceOf(address(fed));
-        usdcBal = USDC.balanceOf(address(fed));
-
-        emit log_named_uint("dola bal", dolaBal);
-        emit log_named_uint("usdc bal", usdcBal);
     }
 
     function testL2_onlyChair_fail_whenCalledByBridge_NonChairSender() public {

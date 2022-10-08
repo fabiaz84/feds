@@ -121,43 +121,6 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Swaps the majority token for the minority token in the DOLA/USDC Velodrome pool, and then adds liquidity to DOLA/USDC pool, then deposits LP tokens into DOLA gauge.
-    @dev The optimizeLP function is not precise, and will likely leave some dust amount of tokens in the contract.
-    @param dolaAmount Amount of DOLA to be used. Some may be sold for USDC if there's an excess of DOLA in the pair.
-    @param usdcAmount Amount of USDC to be used. Some may be sold for DOLA if there's an excess of USDC in the pair.
-    */
-    function swapAndDeposit(uint dolaAmount, uint usdcAmount) public onlyChair {
-        address pair = router.pairFor(address(DOLA), address(USDC), true);
-        uint dolaToDeposit;
-        uint usdcToDeposit;
-        //1e12 magic number is to adjust for USDC 6 decimals precision
-        (uint dolaForUsdc, uint usdcForDola) = optimizeLP(DOLA.balanceOf(pair), USDC.balanceOf(pair)*1e12, dolaAmount, usdcAmount*1e12);
-        usdcForDola = usdcForDola / 1e12;
-        if(usdcForDola == 0){
-            uint minOut = dolaForUsdc * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
-            DOLA.approve(address(router), dolaForUsdc);
-            uint[] memory amounts = router.swapExactTokensForTokensSimple(dolaForUsdc, minOut, address(DOLA), address(USDC), true, address(this), block.timestamp);
-            dolaToDeposit = dolaAmount - dolaForUsdc;
-            usdcToDeposit = usdcAmount + amounts[1];
-        } else {
-            uint minOut = usdcForDola * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
-            USDC.approve(address(router), usdcForDola);
-            uint[] memory amounts = router.swapExactTokensForTokensSimple(usdcForDola, minOut, address(USDC), address(DOLA), true, address(this), block.timestamp);       
-            dolaToDeposit = dolaAmount + amounts[1];
-            usdcToDeposit = usdcAmount - usdcForDola;
-        }
-        USDC.approve(address(router), usdcToDeposit);
-        DOLA.approve(address(router), dolaToDeposit);
-        deposit(dolaToDeposit, usdcToDeposit);
-    }
-    /**
-    @notice Attemps to add all tokens in the Fed as liquidity before depositing to the DOLA gauge. It is likely that some dust amount will be left.
-    */
-    function swapAndDepositAll() public onlyChair {
-        swapAndDeposit(DOLA.balanceOf(address(this)), USDC.balanceOf(address(this)));
-    }
-
-    /**
     @notice Attempts to deposit `dolaAmount` of DOLA & `usdcAmount` of USDC into Velodrome DOLA/USDC stable pool. Then, deposits LP tokens into gauge.
     @param dolaAmount Amount of DOLA to be added as liquidity in Velodrome DOLA/USDC pool
     @param usdcAmount Amount of USDC to be added as liquidity in Velodrome DOLA/USDC pool

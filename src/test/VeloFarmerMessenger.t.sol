@@ -10,13 +10,14 @@ contract VeloFarmerMessengerTest is Test {
     address gov = address(0xA);
     address chair = address(0xB);
     address user = address(0xC);
+    address guardian = address(0xD);
     address veloFedPlaceholder = address(0xD);
 
     error OnlyGov();
     error OnlyChair();
 
     function setUp() public {
-        messenger = new VeloFarmerMessenger(gov, chair, veloFedPlaceholder);
+        messenger = new VeloFarmerMessenger(gov, chair, guardian, veloFedPlaceholder);
     }
 
     function test_setPendingGovFunction_fails_whenCalledByNonGov() public {
