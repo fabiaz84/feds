@@ -5,10 +5,10 @@ import "forge-std/Script.sol";
 import "../src/velo-fed/VeloFarmer.sol";
 
 contract VeloFarmerDeploy is Script {
-    address chair = 0x8F97cCA30Dbe80e7a8B462F1dD1a51C32accDfC8;
-    address gov = 0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
+    address chair = address(0); //VeloFarmerMessengerAddress
+    address gov = address(0); //VeloFarmerMessengerAddress
     address treasury = 0xa283139017a2f5BAdE8d8e25412C600055D318F8;
-    address guardian = 0xE3eD95e130ad9E15643f5A5f232a3daE980784cd;
+    address guardian = address(0); //VeloFarmerMessengerAddress
     address optiFed = address(0);
 
     address payable router = payable(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9);
