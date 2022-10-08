@@ -311,28 +311,6 @@ contract VeloFarmer {
     }
 
     /**
-    @notice Helper function for approximating the amount of token1 that needs to be traded for token2 when adding liquidity.
-    @param pool1Balance The balance of token1 in the Velodrome pair
-    @param pool2Balance The balance of token2 in the Velodrome pair
-    @param balance1 The balance of token1 to add for liquidity
-    @param balance2 The balance of token2 to add for liquidity
-    */
-    function optimizeLP(uint pool1Balance, uint pool2Balance, uint balance1, uint balance2) public pure returns(uint balance1ForBalance2, uint balance2ForBalance1){
-        uint fee = 2 * 1e14; //0.02%
-        uint k1;
-        uint k2 = pool1Balance + pool2Balance;
-        if(pool2Balance * balance1 > pool1Balance * balance2){
-            k1 = pool2Balance * balance1 - pool1Balance * balance2;
-            balance1ForBalance2 = k1 * (1e18 - fee) / 1e18 / k2;
-            balance2ForBalance1 = 0;
-        } else {
-            k1 = pool1Balance * balance2 - pool2Balance * balance1;
-            balance1ForBalance2 = 0;           
-            balance2ForBalance1 = k1 * (1e18 - fee) / 1e18 / k2;
-        }
-    }
-
-    /**
     @notice Method for `pendingGov` to claim `gov` role.
     */
     function claimGov() external onlyPendingGov {
