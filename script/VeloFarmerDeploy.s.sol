@@ -26,7 +26,7 @@ contract VeloFarmerDeploy is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        veloFarmer = new VeloFarmer(router, DOLA, USDC, gov, chair, treasury, guardian, l2optiBridgeAddress, optiFed, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageBpsLiquidity);
+        // veloFarmer = new VeloFarmer(router, DOLA, USDC, gov, chair, treasury, guardian, l2optiBridgeAddress, optiFed, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageBpsLiquidity);
 
         vm.stopBroadcast();
     }

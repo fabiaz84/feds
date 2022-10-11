@@ -127,8 +127,7 @@ contract VeloFarmer {
         USDC.approve(address(router), usdcAmount);
         (uint dolaSpent, uint usdcSpent, uint lpTokensReceived) = router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, 0, 0, address(this), block.timestamp);
 
-        (uint usdcDolaValue,) = router.getAmountOut(usdcSpent, address(USDC), address(DOLA));
-        uint totalDolaValue = dolaSpent + usdcDolaValue;
+        uint totalDolaValue = dolaSpent + (usdcSpent * DOLA_USDC_CONVERSION_MULTI);
 
         uint expectedLpTokens = totalDolaValue * 1e18 / lpTokenPrice * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         if (lpTokensReceived < expectedLpTokens) revert LiquiditySlippageTooHigh();
@@ -162,8 +161,7 @@ contract VeloFarmer {
         LP_TOKEN.approve(address(router), liquidityToWithdraw);
         (uint amountDola, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, liquidityToWithdraw, 0, 0, address(this), block.timestamp);
 
-        (uint dolaReceivedAsUsdc,) = router.getAmountOut(amountUSDC, address(USDC), address(DOLA));
-        uint totalDolaReceived = amountDola + dolaReceivedAsUsdc;
+        uint totalDolaReceived = amountDola + (amountUSDC * DOLA_USDC_CONVERSION_MULTI);
 
         if ((dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION) > totalDolaReceived) {
             revert LiquiditySlippageTooHigh();
