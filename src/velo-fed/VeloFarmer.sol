@@ -42,6 +42,7 @@ contract VeloFarmer {
     constructor(
             address gov_,
             address chair_,
+            address l2chair_,
             address treasury_,
             address guardian_,
             address bridge_,
@@ -51,8 +52,9 @@ contract VeloFarmer {
             uint maxSlippageBpsLiquidity_
         )
     {
-        chair = chair_;
         gov = gov_;
+        chair = chair_;
+        l2chair = l2chair_;
         treasury = treasury_;
         guardian = guardian_;
         bridge = IL2ERC20Bridge(bridge_);
