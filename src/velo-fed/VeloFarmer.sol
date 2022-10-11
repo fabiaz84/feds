@@ -25,9 +25,9 @@ contract VeloFarmer {
     IERC20 public constant LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
     address public constant veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
     ICrossDomainMessenger public constant ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
-    IRouter public router;
-    IERC20 public DOLA;
-    IERC20 public USDC;
+    IRouter public constant router = IRouter(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9);
+    IERC20 public constant DOLA = IERC20(0x8aE125E8653821E851F12A49F7765db9a9ce7384);
+    IERC20 public constant USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
     IL2ERC20Bridge public bridge;
     address public optiFed;
 
@@ -40,9 +40,6 @@ contract VeloFarmer {
     error LiquiditySlippageTooHigh();
     
     constructor(
-            address payable routerAddr_, 
-            address dolaAddr_, 
-            address usdcAddr_,
             address gov_,
             address chair_,
             address treasury_,
@@ -54,9 +51,6 @@ contract VeloFarmer {
             uint maxSlippageBpsLiquidity_
         )
     {
-        router = IRouter(routerAddr_);
-        DOLA = IERC20(dolaAddr_);
-        USDC = IERC20(usdcAddr_);
         chair = chair_;
         gov = gov_;
         treasury = treasury_;
