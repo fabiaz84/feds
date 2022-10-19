@@ -149,6 +149,15 @@ contract VeloFarmer {
         deposit(DOLA.balanceOf(address(this)), USDC.balanceOf(address(this)));
     }
 
+    function swapAndDeposit(uint dolaAmountToSwap, uint usdcAmountToSwap, uint dolaAmountToDespoit, uint usdcAmountToDeposit){
+        if(dolaAmountToSwap > 0 && usdcAmountToSwap < 0){
+            swapDolaToUsdc(dolaAmountToSwap);
+        } else if(usdcAmountToSwap > 0 && dolaAmountToSwap < 0){
+            swapUSDCtoDola(usdcAmountToSWap);
+        }
+        deposit(dolaAmountToDeposit, usdcAmountToDeposit);
+    }
+
     /**
     @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
     @dev If attempting to remove more DOLA than total LP tokens are worth, will remove all LP tokens.
