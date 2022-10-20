@@ -14,8 +14,8 @@ interface IBABP is IERC20{
 }
 
 interface IBalancerHelper{
-    function queryExit(bytes32 poolId, address sender, address recipient, IVault.ExitPoolRequest) external returns (uint256 bptIn, uint256[] memory amountsOut);
-    function queryJoin(bytes32 poolId, address sender, address recipient, IVault.JoinPoolRequest) external returns (uint256 bptOut, uint256[] memory amountsIn);
+    function queryExit(bytes32 poolId, address sender, address recipient, IVault.ExitPoolRequest memory erp) external returns (uint256 bptIn, uint256[] memory amountsOut);
+    function queryJoin(bytes32 poolId, address sender, address recipient, IVault.JoinPoolRequest memory jrp) external returns (uint256 bptOut, uint256[] memory amountsIn);
 }
 
 
@@ -27,19 +27,20 @@ contract BalancerMetapoolAdapter {
     IERC20 immutable dola;
     IBPT immutable bbAUSD = IBPT(0xA13a9247ea42D743238089903570127DdA72fE44);
     IBalancerHelper helper = IBalancerHelper(0x5aDDCCa35b7A0D07C74063c48700C8590E87864E);
-    IERC20 immutable bpt;
+    IBPT immutable bpt = IBPT(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
     IVault vault;
     IAsset[] assets = new IAsset[](0);
     uint dolaIndex = type(uint).max;
     
+    event log_addr(address);
+
     constructor(bytes32 poolId_, address dola_, address vault_){
         poolId = poolId_;
         bbaUSDpoolId = bbAUSD.getPoolId();
         dola = IERC20(dola_);
         vault = IVault(vault_);
-        (address bptAddress,) = vault.getPool(poolId_);
-        bpt = IERC20(bptAddress);
-        (IERC20[] memory tokens,,) = vault.getPoolTokens(poolId_);
+        //(address bptAddress, IVault.PoolSpecialization specialization) = vault.getPool(poolId_);
+        (IERC20[] memory tokens,,) = vault.getPoolTokens(bpt.getPoolId());
         for(uint i; i<tokens.length; i++){
             assets.push(IAsset(address(tokens[i])));
             if(tokens[i] == dola){
@@ -116,7 +117,7 @@ contract BalancerMetapoolAdapter {
         //TODO: THIS IS CURRENTLY UNSAFE!
         uint init = dola.balanceOf(address(this));
         uint maxBPTin = type(uint).max;
-        vault.exitPool(poolId, address(this), payable(address(this)), createExitPoolRequest(dolaAmount, maxBPTin));
+        vault.exitPool(poolId, address(this), payable(address(this)), createExitPoolRequest(dolaIndex, dolaAmount, maxBPTin));
         uint dolaOut = dola.balanceOf(address(this)) - init;
         require(dolaOut >= dolaAmount * BPS / maxSlippage,  "NOT ENOUGH DOLA RECEIVED");
         return dolaOut;
@@ -127,17 +128,18 @@ contract BalancerMetapoolAdapter {
         vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(dolaIndex, expectedDolaAmount, expectedDolaAmount * BPS / maxSlippage));
     }
 
-    function aaveLinearPoolValue(bytes32 poolId, uint amount) internal returns(uint){
-        return helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(0, amount, 0));
+    function _outFromExactIn(bytes32 poolId, uint lpAmountIn, uint indexOut) internal returns(uint) {
+        (,uint[] memory amountsOut) = helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(indexOut, lpAmountIn, 0));
+         return amountsOut[indexOut];
     }
 
-    function bbaUSDValue(uint amount, bool optimistic) internal returns(uint){
+    function _bbaUSDValue(uint amount, bool optimistic) internal returns(uint){
         //TODO: Find better way to ensure that the indexes we're hitting are DAI, USDC and USDT
-        uint out;
-        (address[] aaveLinearTokens,,) = vault.getPoolTokens(bbaUSDpoolId);
-        for(int i; i < 3; i++){
-            uint specificOut = helper.queryExit(bbAUSDpoolId, address(this), address(this), createExitExactPoolRequest(i, amount, 0));
-            uint mainOut = helper.queryExit(IBPT(aaveLinerTokens[i]).getPoolId(), address(this), address(this), createExitExactPoolRequest(0, specificOut, 0));
+        uint out = optimistic ? 0 : type(uint).max;
+        (IERC20[] memory aaveLinearTokens,,) = vault.getPoolTokens(bbaUSDpoolId);
+        for(uint i; i < 3; i++){
+            uint specificOut = _outFromExactIn(bbaUSDpoolId, amount, i);
+            uint mainOut = _outFromExactIn(IBPT(address(aaveLinearTokens[i])).getPoolId(), specificOut, i);
             if(optimistic ? mainOut > out : mainOut < out){
                 out = specificOut;
             }
@@ -145,10 +147,10 @@ contract BalancerMetapoolAdapter {
         return out;
     }
 
-    function bptUSDValue(uint amount, bool optimistic) internal returns(uint){
-        uint dolaValue = helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(0, amount, 0));
-        uint bbaUSDAmount = helper.queryExit(poolId, address(this), address(this), createExitExactPoolRequest(1, amount, 0));
-        uint bbaUsdValue = bbaUSDValue(bbaUSDAmount, optimistic);
+    function _bptUSDValue(uint amount, bool optimistic) internal returns(uint){
+        uint dolaValue = _outFromExactIn(poolId, amount, 0);
+        uint bbaUSDAmount = _outFromExactIn(poolId, amount, 1);
+        uint bbaUsdValue = _bbaUSDValue(bbaUSDAmount, optimistic);
         if(optimistic){
             return dolaValue > bbaUsdValue ? dolaValue : bbaUsdValue;
         } else {
@@ -157,6 +159,7 @@ contract BalancerMetapoolAdapter {
     }
 
     function bptNeededForDola(uint dolaAmount) public returns(uint) {
-        return vault.queryExit(poolId, address(this), address(this), createExitPoolRequest(0, dolaAmount, 0));
+        (,uint[] memory amountsOut) = helper.queryExit(poolId, address(this), address(this), createExitPoolRequest(dolaIndex, dolaAmount, 0));
+        return amountsOut[dolaIndex];
     }
 }

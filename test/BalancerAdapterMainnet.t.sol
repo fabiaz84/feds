@@ -14,23 +14,35 @@ contract PublicBalancerAdapter is BalancerMetapoolAdapter{
     function withdraw(uint dolaAmount, uint maxLossBps) public {
         _withdraw(dolaAmount, maxLossBps);
     }
+
+    function bptUSDValue(uint amount, bool optimistic) public returns(uint){
+        return _bptUSDValue(amount, optimistic);
+    }
 }
 
 contract BalancerAdapterTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
-    address vault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
-    address token = address(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
-    bytes32 poolId = bytes32(0xcfca23ca9ca720b6e98e3eb9b6aa0ffc4a5c08b9000200000000000000000274);
-    address holder = 0x054BA12713290eF5B9236E55944713c0Edeb4Cf4;
+    address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+    address dola = 0x865377367054516e17014CcdED1e7d814EDC9ce4;
+    bytes32 poolId = bytes32(0xa13a9247ea42d743238089903570127dda72fe4400000000000000000000035d);
+    address holder = 0x4D2F01D281Dd0b98e75Ca3E1FdD36823B16a7dbf;
     PublicBalancerAdapter adapter;
 
     function setUp() public {
-        adapter = new PublicBalancerAdapter(poolId, token, vault);
+        adapter = new PublicBalancerAdapter(poolId, dola, vault);
         vm.prank(holder);
-        IERC20(token).transfer(address(adapter), 1 ether);
+        IERC20(dola).transfer(address(adapter), 1 ether);
     }
 
     function testDeposit_success_whenDepositingZero() public {
         adapter.deposit(1 ether, 0);
     }
+
+    function testbptUsdValue() public {
+        emit log_uint(adapter.bptUSDValue(1 ether, true));
+        emit log_uint(adapter.bptUSDValue(1 ether, false));
+    }
+    
+
+
 }
