@@ -25,7 +25,7 @@ interface IVault {
         external
         view
         returns (
-            IERC20[] memory tokens,
+            address[] memory tokens,
             uint256[] memory balances,
             uint256 lastChangeBlock
     );

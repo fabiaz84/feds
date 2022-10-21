@@ -5,6 +5,8 @@ interface IAuraLocker {
 
     function lock(address _account, uint256 _amount) external;
 
+    function lockedBalances(address _account) view external returns (uint);
+
     function checkpointEpoch() external;
 
     function epochCount() external view returns (uint256);
