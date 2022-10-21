@@ -7,6 +7,8 @@ interface IAuraBalRewardPool {
     function auraLocker() external view returns (IAuraLocker);
 
     function rewardToken() external view returns (address);
+    
+    function stakingToken() external view returns (address);
 
     function totalSupply() external view returns (uint256);
 
@@ -26,11 +28,15 @@ interface IAuraBalRewardPool {
 
     function withdraw(uint256 amount, bool claim, bool lock) external returns (bool);
 
+    function withdrawAndUnwrap(uint256 amount, bool claim) external returns (bool);
+
     /**
      * @dev Gives a staker their rewards
      * @param _lock Lock the rewards? If false, takes a 20% haircut
      */
     function getReward(bool _lock) external returns (bool);
+
+    function getReward(address _addr, bool _claimExtra) external returns (bool);
 
     /**
      * @dev Forwards to the penalty forwarder for distro to Aura Lockers

@@ -54,28 +54,26 @@ contract BalancerMetapoolAdapter {
     }
 
     function getUserDataExactInBPT(uint amountIn) internal view returns(bytes memory) {
-        uint[] memory amounts = new uint[](assets.length);
-        amounts[dolaIndex] = amountIn;
+        uint[] memory amounts = new uint[](assets.length-1);
+        amounts[dolaIndex-1] = amountIn;
         return abi.encode(0, amounts);
     }
 
     function getUserDataCustomExit(uint exactDolaOut, uint maxBPTin) internal view returns(bytes memory) {
-        uint[] memory amounts = new uint[](assets.length);
-        amounts[dolaIndex] = exactDolaOut;
+        uint[] memory amounts = new uint[](assets.length-1);
+        amounts[dolaIndex-1] = exactDolaOut;
         return abi.encode(2, amounts, maxBPTin);
     }
 
     function getUserDataExitExact(uint exactBptIn) internal view returns(bytes memory) {
-        return abi.encode(1, exactBptIn, dolaIndex);
+        return abi.encode(1, exactBptIn, dolaIndex-1);
     }
-    event log_uint(uint);
+
     function createJoinPoolRequest(uint dolaAmount) internal returns(IVault.JoinPoolRequest memory){
         IVault.JoinPoolRequest memory jpr;
         jpr.assets = assets;
         jpr.maxAmountsIn = new uint[](assets.length);
         jpr.maxAmountsIn[dolaIndex] = dolaAmount;
-        emit log_uint(jpr.assets.length);
-        emit log_uint(jpr.maxAmountsIn.length);
         jpr.userData = getUserDataExactInDola(dolaAmount);
         jpr.fromInternalBalance = false;
         return jpr;
@@ -114,8 +112,8 @@ contract BalancerMetapoolAdapter {
     function _withdraw(uint dolaAmount, uint maxSlippage) internal returns(uint){
         uint init = dola.balanceOf(address(this));
         uint bptNeeded = bptNeededForDola(dolaAmount);
-        uint maxBPTin = bptNeeded + bptNeeded * maxSlippage / BPS;
-        vault.exitPool(poolId, address(this), payable(address(this)), createExitPoolRequest(dolaIndex, dolaAmount, maxBPTin));
+        uint minDolaOut = dolaAmount - dolaAmount * maxSlippage / BPS;
+        vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(0, bptNeeded, minDolaOut));
         uint dolaOut = dola.balanceOf(address(this)) - init;
         return dolaOut;
     }
