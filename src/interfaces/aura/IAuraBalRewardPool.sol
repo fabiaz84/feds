@@ -42,4 +42,6 @@ interface IAuraBalRewardPool {
      * @dev Forwards to the penalty forwarder for distro to Aura Lockers
      */
     function forwardPenalty() external;
+
+    function periodFinish() external returns (uint);
 }

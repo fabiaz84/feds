@@ -19,7 +19,7 @@ interface IBalancerHelper{
 }
 
 
-contract BalancerMetapoolAdapter {
+contract BalancerComposableStablepoolAdapter {
     
     uint constant BPS = 10_000;
     bytes32 immutable poolId;
@@ -28,8 +28,6 @@ contract BalancerMetapoolAdapter {
     IBalancerHelper helper = IBalancerHelper(0x5aDDCCa35b7A0D07C74063c48700C8590E87864E);
     IBPT immutable bpt = IBPT(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
     IVault vault;
-    IAsset[] assets = new IAsset[](0);
-    uint dolaIndex = type(uint).max;
     
     constructor(bytes32 poolId_, address dola_, address vault_){
         poolId = poolId_;
@@ -37,95 +35,85 @@ contract BalancerMetapoolAdapter {
         vault = IVault(vault_);
         dola.approve(vault_, type(uint).max);
         bpt.approve(vault_, type(uint).max);
-        (address[] memory tokens,,) = vault.getPoolTokens(poolId_);
-        for(uint i; i<tokens.length; i++){
-            assets.push(IAsset(address(tokens[i])));
-            if(address(tokens[i]) == dola_){
-                dolaIndex = i;
-            }
-        }
-        require(dolaIndex < type(uint).max, "Underlying token not found");
+    }
+    
+    /**
+    @notice Swaps exact amount of assetIn for asseetOut through a balancer pool. Output must be higher than minOut
+    @dev Due to the unique design of Balancer ComposableStablePools, where BPT are part of the swappable balance, we can just swap DOLA directly for BPT
+    @param assetIn Address of the asset to trade an exact amount in
+    @param assetOut Address of the asset to trade for
+    @param amount Amount of assetIn to trade
+    @param minOut minimum amount of assetOut to receive
+    */
+    function swapExactIn(address assetIn, address assetOut, uint amount, uint minOut) internal {
+        IVault.FundManagement memory fundMan;
+        IVault.SingleSwap memory swapStruct;
+
+        //Populate fund management struct
+        fundMan.sender = address(this);
+        fundMan.fromInternalBalance = false;
+        fundMan.recipient = payable(address(this));
+        fundMan.toInternalBalance = false;
+
+        //Populate Single Swap struct
+        swapStruct.poolId = poolId;
+        swapStruct.kind = IVault.SwapKind.GIVEN_IN;
+        swapStruct.assetIn = IAsset(assetIn);
+        swapStruct.assetOut = IAsset(assetOut);
+        swapStruct.amount = amount;
+        //swapStruct.userData: User data can be left empty
+
+        vault.swap(swapStruct, fundMan, minOut, block.timestamp+1);
     }
 
-    function getUserDataExactInDola(uint amountIn) internal view returns(bytes memory) {
-        uint[] memory amounts = new uint[](assets.length-1);
-        amounts[dolaIndex-1] = amountIn;
-        return abi.encode(1, amounts, 0);
-    }
-
-    function getUserDataExactInBPT(uint amountIn) internal view returns(bytes memory) {
-        uint[] memory amounts = new uint[](assets.length-1);
-        amounts[dolaIndex-1] = amountIn;
-        return abi.encode(0, amounts);
-    }
-
-    function getUserDataCustomExit(uint exactDolaOut, uint maxBPTin) internal view returns(bytes memory) {
-        uint[] memory amounts = new uint[](assets.length-1);
-        amounts[dolaIndex-1] = exactDolaOut;
-        return abi.encode(2, amounts, maxBPTin);
-    }
-
-    function getUserDataExitExact(uint exactBptIn) internal view returns(bytes memory) {
-        return abi.encode(1, exactBptIn, dolaIndex-1);
-    }
-
-    function createJoinPoolRequest(uint dolaAmount) internal returns(IVault.JoinPoolRequest memory){
-        IVault.JoinPoolRequest memory jpr;
-        jpr.assets = assets;
-        jpr.maxAmountsIn = new uint[](assets.length);
-        jpr.maxAmountsIn[dolaIndex] = dolaAmount;
-        jpr.userData = getUserDataExactInDola(dolaAmount);
-        jpr.fromInternalBalance = false;
-        return jpr;
-    }
-
-    function createExitPoolRequest(uint index, uint dolaAmount, uint maxBPTin) internal view returns (IVault.ExitPoolRequest memory){
-        IVault.ExitPoolRequest memory epr;
-        epr.assets = assets;
-        epr.minAmountsOut = new uint[](assets.length);
-        epr.minAmountsOut[index] = dolaAmount;
-        epr.userData = getUserDataCustomExit(dolaAmount, maxBPTin);
-        epr.toInternalBalance = false;
-        return epr;
-    }
-
-    function createExitExactPoolRequest(uint index, uint bptAmount, uint minDolaOut) internal view returns (IVault.ExitPoolRequest memory){
-        IVault.ExitPoolRequest memory epr;
-        epr.assets = assets;
-        epr.minAmountsOut = new uint[](assets.length);
-        epr.minAmountsOut[index] = minDolaOut;
-        epr.userData = getUserDataExitExact(bptAmount);
-        epr.toInternalBalance = false;
-        return epr;
-    }
-
-
+    /**
+    @notice Deposit an amount of dola into balancer, getting balancer pool tokens in return
+    @param dolaAmount Amount of dola to buy BPTs for
+    @param maxSlippage Maximum amount of value that can be lost in basis points, assuming DOLA = 1$
+    */
     function _deposit(uint dolaAmount, uint maxSlippage) internal returns(uint){
         uint init = bpt.balanceOf(address(this));
         uint bptWanted = bptNeededForDola(dolaAmount);
-        vault.joinPool(poolId, address(this), address(this), createJoinPoolRequest(dolaAmount));
+        uint minBptOut = bptWanted - bptWanted * maxSlippage / BPS;
+        swapExactIn(address(dola), address(bpt), dolaAmount, minBptOut);
         uint bptOut =  bpt.balanceOf(address(this)) - init;
-        require(bptOut > bptWanted - bptWanted * maxSlippage / BPS, "Insufficient BPT received");
         return bptOut;
     }
-
+    
+    /**
+    @notice Withdraws an amount of value close to dolaAmount
+    @dev Will rarely withdraw an amount equal to dolaAmount, due to slippage.
+    @param dolaAmount Amount of dola the withdrawer wants to withdraw
+    @param maxSlippage Maximum amount of value that can be lost in basis points, assuming DOLA = 1$
+    */
     function _withdraw(uint dolaAmount, uint maxSlippage) internal returns(uint){
         uint init = dola.balanceOf(address(this));
         uint bptNeeded = bptNeededForDola(dolaAmount);
         uint minDolaOut = dolaAmount - dolaAmount * maxSlippage / BPS;
-        vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(0, bptNeeded, minDolaOut));
+        swapExactIn(address(bpt), address(dola), bptNeeded, minDolaOut);
         uint dolaOut = dola.balanceOf(address(this)) - init;
         return dolaOut;
     }
 
+    /**
+    @notice Withdraws all BPT in the contract
+    @dev Will rarely withdraw an amount equal to dolaAmount, due to slippage.
+    @param maxSlippage Maximum amount of value that can be lost in basis points, assuming DOLA = 1$
+    */
     function _withdrawAll(uint maxSlippage) internal returns(uint){
         uint bptBal = bpt.balanceOf(address(this));
         uint expectedDolaOut = bptBal * bpt.getRate() / 10**18;
         uint minDolaOut = expectedDolaOut - expectedDolaOut * maxSlippage / BPS;
-        vault.exitPool(poolId, address(this), payable(address(this)), createExitExactPoolRequest(dolaIndex, bptBal, minDolaOut));
+        swapExactIn(address(bpt), address(dola), bptBal, minDolaOut);
         return dola.balanceOf(address(this));
     }
 
+    /**
+    @notice Get amount of BPT equal to the value of dolaAmount, assuming Dola = 1$
+    @dev Uses the getRate() function of the balancer pool to calculate the value of the dolaAmount
+    @param dolaAmount Amount of DOLA to get the equal value in BPT.
+    @return Uint representing the amount of BPT the dolaAmount should be worth.
+    */
     function bptNeededForDola(uint dolaAmount) public view returns(uint) {
         return dolaAmount * 10**18 / bpt.getRate();
     }
