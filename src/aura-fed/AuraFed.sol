@@ -202,6 +202,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     function burnRemainingDolaSupply() public {
         dola.transferFrom(msg.sender, address(this), dolaSupply);
         dola.burn(dolaSupply);
+        dolaSupply = 0;
     }
     
     /**

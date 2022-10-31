@@ -23,7 +23,6 @@ contract AuraFedTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
     IMintable dola = IMintable(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 bpt = IERC20(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
-    //address auraBal = 0x616e8BfA43F920657B3497DBf40D6b1A02D4608d;
     IERC20 bal = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
     IERC20 aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
@@ -204,7 +203,6 @@ contract AuraFedTest is DSTest{
     }
     
     function testTakeProfit_IncreaseGovDolaBalance_whenDolaHasBeenSentToContract() public {
-
         vm.startPrank(chair);
         fed.expansion(1000 ether);
         vm.stopPrank();
@@ -231,13 +229,23 @@ contract AuraFedTest is DSTest{
         assertGt(dola.balanceOf(gov), initialGovDola, "Gov DOLA balance didn't increase");
     }
 
+    function testburnRemainingDolaSupply_Success() public {
+        vm.startPrank(chair);
+        fed.expansion(1000 ether);
+        vm.stopPrank();       
+        vm.startPrank(minter);
+        dola.mint(address(minter), 1000 ether);
+        dola.approve(address(fed), 1000 ether);
+
+        fed.burnRemainingDolaSupply();
+        assertEq(fed.dolaSupply(), 0);
+    }
+
     function testContraction_FailWithOnlyChair_whenCalledByOtherAddress() public {
         vm.prank(gov);
         vm.expectRevert("ONLY CHAIR");
         fed.contraction(1000);
     }
-
-    
 
     function testSetMaxLossExpansionBps_succeed_whenCalledByGov() public {
         uint initial = fed.maxLossExpansionBps();
