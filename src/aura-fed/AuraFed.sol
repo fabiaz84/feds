@@ -20,7 +20,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     address public chair; // Fed Chair
     address public gov;
     uint public dolaSupply;
-    uint public constant pid = 49; //Guage pid, should never change
+    uint public constant pid = 49; //Gauge pid, should never change
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
@@ -75,7 +75,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
 
     /**
-    @notice Method for current chair of the Yearn FED to resign
+    @notice Method for current chair of the Aura FED to resign
     */
     function resign() public {
         require(msg.sender == chair, "ONLY CHAIR");
@@ -113,9 +113,8 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
     /**
     @notice Withdraws an amount of dola token to be burnt, contracting DOLA dolaSupply
-    @dev Be careful when setting maxLoss parameter. There will almost always be some loss,
-    if the yEarn vault is forced to withdraw from dola strategies. 
-    For example, slippage + trading fees may be incurred when withdrawing from a Balancer pool.
+    @dev Be careful when setting maxLoss parameter. There will almost always be some loss from
+    slippage + trading fees that may be incurred when withdrawing from a Balancer pool.
     On the other hand, setting the maxLoss too high, may cause you to be front run by MEV
     sandwhich bots, making sure your entire maxLoss is incurred.
     Recommended to always broadcast withdrawl transactions(contraction & takeProfits)
