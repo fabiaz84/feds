@@ -8,26 +8,14 @@ interface IBPT is IERC20{
     function getRate() external view returns (uint256);
 }
 
-interface IBABP is IERC20{
-    function getMainToken() external view returns (address);
-    function getWrappedToken() external view returns (address);
-}
-
-interface IBalancerHelper{
-    function queryExit(bytes32 poolId, address sender, address recipient, IVault.ExitPoolRequest memory erp) external returns (uint256 bptIn, uint256[] memory amountsOut);
-    function queryJoin(bytes32 poolId, address sender, address recipient, IVault.JoinPoolRequest memory jrp) external returns (uint256 bptOut, uint256[] memory amountsIn);
-}
-
-
 contract BalancerComposableStablepoolAdapter {
     
     uint constant BPS = 10_000;
     bytes32 immutable poolId;
-    IERC20 dola;
-    IBPT immutable bbAUSD = IBPT(0xA13a9247ea42D743238089903570127DdA72fE44);
-    IBalancerHelper helper = IBalancerHelper(0x5aDDCCa35b7A0D07C74063c48700C8590E87864E);
+    IERC20 immutable dola;
     IBPT immutable bpt = IBPT(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
-    IVault vault;
+    IVault immutable vault;
+    IVault.FundManagement fundMan;
     
     constructor(bytes32 poolId_, address dola_, address vault_){
         poolId = poolId_;
@@ -35,6 +23,10 @@ contract BalancerComposableStablepoolAdapter {
         vault = IVault(vault_);
         dola.approve(vault_, type(uint).max);
         bpt.approve(vault_, type(uint).max);
+        fundMan.sender = address(this);
+        fundMan.fromInternalBalance = false;
+        fundMan.recipient = payable(address(this));
+        fundMan.toInternalBalance = false;
     }
     
     /**
@@ -46,14 +38,7 @@ contract BalancerComposableStablepoolAdapter {
     @param minOut minimum amount of assetOut to receive
     */
     function swapExactIn(address assetIn, address assetOut, uint amount, uint minOut) internal {
-        IVault.FundManagement memory fundMan;
         IVault.SingleSwap memory swapStruct;
-
-        //Populate fund management struct
-        fundMan.sender = address(this);
-        fundMan.fromInternalBalance = false;
-        fundMan.recipient = payable(address(this));
-        fundMan.toInternalBalance = false;
 
         //Populate Single Swap struct
         swapStruct.poolId = poolId;

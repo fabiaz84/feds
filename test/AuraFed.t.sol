@@ -23,14 +23,12 @@ contract AuraFedTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
     IMintable dola = IMintable(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 bpt = IERC20(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
-    address auraBal = 0x616e8BfA43F920657B3497DBf40D6b1A02D4608d;
+    //address auraBal = 0x616e8BfA43F920657B3497DBf40D6b1A02D4608d;
     IERC20 bal = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
     IERC20 aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    //address baseRewardPool = 0x5e5ea2048475854a5702F5B8468A51Ba1296EFcC;
     IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0x99653d46D52eE41c7b35cbAd1aC408A00bad6A76);
     address booster = 0x7818A1DA7BD1E64c199029E86Ba244a9798eEE10;
-    address auraLocker = 0x3Fa73f1E5d8A792C80F426fc8F84FBF7Ce9bBCAC;
     address chair = address(0xA);
     address minter = address(0xB);
     address gov = address(0x926dF14a23BE491164dCF93f4c468A50ef659D5B);
@@ -45,12 +43,10 @@ contract AuraFedTest is DSTest{
     function setUp() public {
         fed = new AuraFed(
             address(dola), 
-            //auraBal, 
             address(aura), 
             vault, 
             address(baseRewardPool),
             booster,
-            auraLocker,
             chair, 
             gov,
             maxLossExpansion,
@@ -120,7 +116,7 @@ contract AuraFedTest is DSTest{
         uint initialGovDola = dola.balanceOf(gov);
 
         vm.prank(chair);
-        fed.contraction(amount*100/99);
+        fed.contraction(amount);
 
         //Make sure basic accounting of contraction is correct:
         assertGt(initialBalLpSupply, fed.bptSupply(), "BPT Supply didn't drop");
@@ -153,7 +149,7 @@ contract AuraFedTest is DSTest{
     function testContractAll_succeed_whenContractedWithProfit() public {
         vm.prank(chair);
         fed.expansion(1000 ether);
-        washTrade(100, 10_000 ether);
+        washTrade(100, 100_000 ether);
         uint initialDolaSupply = fed.dolaSupply();
         uint initialDolaTotalSupply = dola.totalSupply();
         uint initialGovDola = dola.balanceOf(gov);
@@ -195,14 +191,44 @@ contract AuraFedTest is DSTest{
         uint initialBalLpSupply = fed.bptSupply();
         uint initialGovDola = dola.balanceOf(gov);
         //Pass time
+        washTrade(100, 10_000 ether);
         vm.warp(baseRewardPool.periodFinish() + 1);
+        vm.startPrank(chair);
         fed.takeProfit(false);
         vm.stopPrank();
 
         assertGt(aura.balanceOf(gov), initialAura, "treasury aura balance didn't increase");
         assertGt(bal.balanceOf(gov), initialAuraBal, "treasury bal balance din't increase");
-        assertEq(initialBalLpSupply, fed.bptSupply());
-        assertEq(dola.balanceOf(gov), initialGovDola);
+        assertEq(initialBalLpSupply, fed.bptSupply(), "bpt supply changed");
+        assertEq(dola.balanceOf(gov), initialGovDola, "Gov DOLA supply changed");
+    }
+    
+    function testTakeProfit_IncreaseGovDolaBalance_whenDolaHasBeenSentToContract() public {
+
+        vm.startPrank(chair);
+        fed.expansion(1000 ether);
+        vm.stopPrank();
+        vm.startPrank(minter);
+        dola.mint(address(fed), 1000 ether);
+        vm.stopPrank();
+        vm.startPrank(chair);
+        uint initialAura = aura.balanceOf(gov);
+        uint initialAuraBal = bal.balanceOf(gov);
+        uint initialBalLpSupply = fed.bptSupply();
+        uint initialGovDola = dola.balanceOf(gov);
+        fed.contraction(200 ether);
+        assertEq(fed.dolaSupply(), 0);
+        //Pass time
+        washTrade(100, 10_000 ether);
+        vm.warp(baseRewardPool.periodFinish() + 1);
+        vm.startPrank(chair);
+        fed.takeProfit(true);
+        vm.stopPrank();
+
+        assertGt(aura.balanceOf(gov), initialAura, "treasury aura balance didn't increase");
+        assertGt(bal.balanceOf(gov), initialAuraBal, "treasury bal balance din't increase");
+        assertGt(initialBalLpSupply, fed.bptSupply(), "bpt Supply wasn't reduced");
+        assertGt(dola.balanceOf(gov), initialGovDola, "Gov DOLA balance didn't increase");
     }
 
     function testContraction_FailWithOnlyChair_whenCalledByOtherAddress() public {
@@ -210,6 +236,8 @@ contract AuraFedTest is DSTest{
         vm.expectRevert("ONLY CHAIR");
         fed.contraction(1000);
     }
+
+    
 
     function testSetMaxLossExpansionBps_succeed_whenCalledByGov() public {
         uint initial = fed.maxLossExpansionBps();
@@ -269,6 +297,7 @@ contract AuraFedTest is DSTest{
     }
 
     function washTrade(uint loops, uint amount) public {
+        vm.stopPrank();     
         vm.startPrank(minter);
         dola.mint(address(swapper), amount);
         //Trade back and forth to create a profit

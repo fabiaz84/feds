@@ -26,9 +26,9 @@ interface IAuraBalRewardPool {
 
     function stakeFor(address _for, uint256 _amount) external  returns (bool);
 
-    function withdraw(uint256 amount, bool claim, bool lock) external returns (bool);
-
     function withdrawAndUnwrap(uint256 amount, bool claim) external returns (bool);
+    
+    function withdrawAllAndUnwrap(bool claim) external returns (bool);
 
     /**
      * @dev Gives a staker their rewards
