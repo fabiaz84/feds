@@ -29,6 +29,7 @@ contract AuraFedTest is DSTest{
     IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0x99653d46D52eE41c7b35cbAd1aC408A00bad6A76);
     address booster = 0x7818A1DA7BD1E64c199029E86Ba244a9798eEE10;
     address chair = address(0xA);
+    address guardian = address(0xB);
     address minter = address(0xB);
     address gov = address(0x926dF14a23BE491164dCF93f4c468A50ef659D5B);
     uint maxLossExpansion = 20;
@@ -46,7 +47,8 @@ contract AuraFedTest is DSTest{
             vault, 
             address(baseRewardPool),
             booster,
-            chair, 
+            chair,
+            guardian,
             gov,
             maxLossExpansion,
             maxLossWithdraw,

@@ -18,13 +18,14 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     IERC20 public bal;
     IERC20 public aura;
     address public chair; // Fed Chair
+    address public guardian;
     address public gov;
     uint public dolaSupply;
-    uint public constant pid = 49; //Gauge pid, should never change
+    uint public constant pid = 8; //Gauge pid, should never change
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
-    uint public maxLossSetableByChair = 500;
+    uint public maxLossSetableByGuardian = 500;
 
     event Expansion(uint amount);
     event Contraction(uint amount);
@@ -36,6 +37,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
             address dolaBptRewardPool_, 
             address booster_,
             address chair_,
+            address guardian_,
             address gov_, 
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
@@ -57,6 +59,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
         chair = chair_;
         gov = gov_;
+        guardian = guardian_;
     }
 
     /**
@@ -64,6 +67,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     */
     function changeGov(address newGov_) public {
         require(msg.sender == gov, "ONLY GOV");
+
         gov = newGov_;
     }
 
@@ -90,10 +94,10 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
 
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
-        require(msg.sender == gov || msg.sender == chair, "ONLY GOV OR CHAIR");
-        if(msg.sender == chair){
+        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV OR CHAIR");
+        if(msg.sender == guardian){
             //We limit the max loss a chair can set to 10%, as we only want governance to be able to set a very high maxloss 
-            require(newMaxLossWithdrawBps <= maxLossSetableByChair, "Above allowed maxloss for chair");
+            require(newMaxLossWithdrawBps <= maxLossSetableByGuardian, "Above allowed maxloss for chair");
         }
         require(newMaxLossWithdrawBps <= 10000, "Can't have max loss above 100%");
         maxLossWithdrawBps = newMaxLossWithdrawBps;
@@ -105,10 +109,10 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         maxLossTakeProfitBps = newMaxLossTakeProfitBps;   
     }
 
-    function setMaxLossSetableByChair(uint newMaxLossSetableByChair) public {
+    function setMaxLossSetableByGuardian(uint newMaxLossSetableByGuardian) public {
         require(msg.sender == gov, "ONLY GOV");
-        require(newMaxLossSetableByChair < 10000);
-        maxLossSetableByChair = newMaxLossSetableByChair;
+        require(newMaxLossSetableByGuardian < 10000);
+        maxLossSetableByGuardian = newMaxLossSetableByGuardian;
     }
     /**
     @notice Deposits amount of dola tokens into balancer, before locking with aura

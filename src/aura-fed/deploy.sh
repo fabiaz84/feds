@@ -14,4 +14,3 @@ forge create --rpc-url $1 \
     --private-key $3 src/aura-fed/AuraFed.sol:AuraFed \
     --etherscan-api-key $2 \
     --verify
-
