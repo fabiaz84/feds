@@ -24,6 +24,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
+    uint public maxLossSetableByChair = 500;
 
     event Expansion(uint amount);
     event Contraction(uint amount);
@@ -89,7 +90,11 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
 
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
-        require(msg.sender == gov, "ONLY GOV");
+        require(msg.sender == gov || msg.sender == chair, "ONLY GOV OR CHAIR");
+        if(msg.sender == chair){
+            //We limit the max loss a chair can set to 10%, as we only want governance to be able to set a very high maxloss 
+            require(newMaxLossWithdrawBps <= maxLossSetableByChair, "Above allowed maxloss for chair");
+        }
         require(newMaxLossWithdrawBps <= 10000, "Can't have max loss above 100%");
         maxLossWithdrawBps = newMaxLossWithdrawBps;
     }
@@ -98,6 +103,12 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         require(msg.sender == gov, "ONLY GOV");
         require(newMaxLossTakeProfitBps <= 10000, "Can't have max loss above 100%");
         maxLossTakeProfitBps = newMaxLossTakeProfitBps;   
+    }
+
+    function setMaxLossSetableByChair(uint newMaxLossSetableByChair) public {
+        require(msg.sender == gov, "ONLY GOV");
+        require(newMaxLossSetableByChair < 10000);
+        maxLossSetableByChair = newMaxLossSetableByChair;
     }
     /**
     @notice Deposits amount of dola tokens into balancer, before locking with aura
