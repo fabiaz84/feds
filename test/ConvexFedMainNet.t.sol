@@ -115,7 +115,7 @@ contract ConvexFedTest is DSTest {
         vm.assume(amount > 10**18);
         vm.prank(chair);
         convexFed.expansion(amount);
-        washTrade(1_000_000 ether, 100);
+        washTrade(5_000_000 ether, 100);
         uint initialDolaSupply = convexFed.dolaSupply();
         uint initialDolaTotalSupply = dola.totalSupply();
         uint initialCrvLpSupply = convexFed.crvLpSupply();
@@ -155,7 +155,7 @@ contract ConvexFedTest is DSTest {
     function testContractAll_succeed_whenContractedWithProfit() public {
         vm.prank(chair);
         convexFed.expansion(100_000 ether);
-        washTrade(100_000 ether, 100);
+        washTrade(5000_000 ether, 100);
         uint initialDolaSupply = convexFed.dolaSupply();
         uint initialDolaTotalSupply = dola.totalSupply();
         uint initialGovDola = dola.balanceOf(gov);
