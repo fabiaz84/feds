@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "../interfaces/velo/ICrossDomainMessenger.sol";
@@ -10,6 +11,8 @@ contract VeloFarmerMessenger {
     address public pendingGov;
     address public guardian;
     address public chair;
+
+    uint32 public gasLimit = 750_000;
 
     constructor(address gov_, address chair_, address guardian_, address veloFed_) {
         gov = gov_;
@@ -46,7 +49,7 @@ contract VeloFarmerMessenger {
     //Helper functions
 
     function sendMessage(bytes memory message) internal {
-        crossDomainMessenger.sendMessage(address(veloFed), message, 0);
+        crossDomainMessenger.sendMessage(address(veloFed), message, gasLimit);
     }
 
     //Gov Messaging functions
@@ -139,6 +142,10 @@ contract VeloFarmerMessenger {
 
     //Gov functions
 
+    function setGasLimit(uint32 newGasLimit_) public onlyGov {
+        gasLimit = newGasLimit_;
+    }
+
     function setPendingMessengerGov(address newPendingGov_) public onlyGov {
         pendingGov = newPendingGov_;
     }
@@ -148,7 +155,7 @@ contract VeloFarmerMessenger {
         pendingGov = address(0);
     }
 
-    function changeMessengerChair(address newChair_) public onlyChair {
+    function changeMessengerChair(address newChair_) public onlyGov {
         chair = newChair_;
     }
 }

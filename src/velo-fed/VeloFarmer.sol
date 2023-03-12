@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "../interfaces/IERC20.sol";
@@ -24,9 +25,9 @@ contract VeloFarmer {
     IERC20 public constant LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
     address public constant veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
     ICrossDomainMessenger public constant ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
-    IRouter public router;
-    IERC20 public DOLA;
-    IERC20 public USDC;
+    IRouter public constant router = IRouter(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9);
+    IERC20 public constant DOLA = IERC20(0x8aE125E8653821E851F12A49F7765db9a9ce7384);
+    IERC20 public constant USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
     IL2ERC20Bridge public bridge;
     address public optiFed;
 
@@ -39,11 +40,9 @@ contract VeloFarmer {
     error LiquiditySlippageTooHigh();
     
     constructor(
-            address payable routerAddr_, 
-            address dolaAddr_, 
-            address usdcAddr_,
             address gov_,
             address chair_,
+            address l2chair_,
             address treasury_,
             address guardian_,
             address bridge_,
@@ -53,11 +52,9 @@ contract VeloFarmer {
             uint maxSlippageBpsLiquidity_
         )
     {
-        router = IRouter(routerAddr_);
-        DOLA = IERC20(dolaAddr_);
-        USDC = IERC20(usdcAddr_);
-        chair = chair_;
         gov = gov_;
+        chair = chair_;
+        l2chair = l2chair_;
         treasury = treasury_;
         guardian = guardian_;
         bridge = IL2ERC20Bridge(bridge_);
@@ -132,8 +129,7 @@ contract VeloFarmer {
         USDC.approve(address(router), usdcAmount);
         (uint dolaSpent, uint usdcSpent, uint lpTokensReceived) = router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, 0, 0, address(this), block.timestamp);
 
-        (uint usdcDolaValue,) = router.getAmountOut(usdcSpent, address(USDC), address(DOLA));
-        uint totalDolaValue = dolaSpent + usdcDolaValue;
+        uint totalDolaValue = dolaSpent + (usdcSpent * DOLA_USDC_CONVERSION_MULTI);
 
         uint expectedLpTokens = totalDolaValue * 1e18 / lpTokenPrice * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         if (lpTokensReceived < expectedLpTokens) revert LiquiditySlippageTooHigh();
@@ -176,8 +172,7 @@ contract VeloFarmer {
         LP_TOKEN.approve(address(router), liquidityToWithdraw);
         (uint amountDola, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, liquidityToWithdraw, 0, 0, address(this), block.timestamp);
 
-        (uint dolaReceivedAsUsdc,) = router.getAmountOut(amountUSDC, address(USDC), address(DOLA));
-        uint totalDolaReceived = amountDola + dolaReceivedAsUsdc;
+        uint totalDolaReceived = amountDola + (amountUSDC * DOLA_USDC_CONVERSION_MULTI);
 
         if ((dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION) > totalDolaReceived) {
             revert LiquiditySlippageTooHigh();

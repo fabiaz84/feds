@@ -65,7 +65,7 @@ contract VeloFarmerMainnetTest is Test {
 
         vm.startPrank(chair);
 
-        fed = new VeloFarmer(payable(address(router)), address(DOLA), address(USDC), gov, chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
+        fed = new VeloFarmer(gov, chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
         vm.makePersistent(address(fed));
 
         vm.stopPrank();
