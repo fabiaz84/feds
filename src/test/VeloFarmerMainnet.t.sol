@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { IDola } from "../interfaces/velo/IDola.sol";
 import "../interfaces/velo/IL2CrossDomainMessenger.sol";
-import "../velo-fed/VeloFarmer.sol";
+import { VeloFarmer, IRouter, IGauge} from "../velo-fed/VeloFarmer.sol";
 import {OptiFed} from "../velo-fed/OptiFed.sol";
 
 contract VeloFarmerMainnetTest is Test {
@@ -64,8 +64,7 @@ contract VeloFarmerMainnetTest is Test {
         vm.label(veloTokenAddr, "VELO");
 
         vm.startPrank(chair);
-
-        fed = new VeloFarmer(gov, chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
+        fed = new VeloFarmer(gov, chair, chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
         vm.makePersistent(address(fed));
 
         vm.stopPrank();

@@ -17,7 +17,7 @@ contract VeloFarmerMessengerMainnetTest is Test {
     error OnlyChair();
 
     function setUp() public {
-        messenger = new VeloFarmerMessenger(0xFed673A89c1B661D9DCA1401FBf3B279DffEaBAe);
+        messenger = VeloFarmerMessenger(0xFed673A89c1B661D9DCA1401FBf3B279DffEaBAe);
     }
 
     function test_setPendingGovFunction_fails_whenCalledByNonGov() public {
@@ -26,13 +26,13 @@ contract VeloFarmerMessengerMainnetTest is Test {
         messenger.setPendingMessengerGov(user);
     }
 
-    function test_setPendingGovFunction_succeeds_whenCalledByGov() {
+    function test_setPendingGovFunction_succeeds_whenCalledByGov() public {
         vm.startPrank(gov);
         messenger.setPendingMessengerGov(user);
         vm.stopPrank();
     }
 
-    function test_setPendingGovFunction_fails_whenCalledByGovTwoTimes() {
+    function test_setPendingGovFunction_fails_whenCalledByGovTwoTimes() public {
         vm.startPrank(gov);
         messenger.setPendingMessengerGov(user);
         vm.expectRevert();
