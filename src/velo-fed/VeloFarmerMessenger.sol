@@ -66,7 +66,7 @@ contract VeloFarmerMessenger {
     }
 
     modifier onlyGovOrGuardian {
-        if (msg.sender != gov || msg.sender != guardian) revert OnlyGov();
+        if (msg.sender != gov && msg.sender != guardian) revert OnlyGov();
         _;
     }
 
@@ -119,6 +119,10 @@ contract VeloFarmerMessenger {
 
     function changeChair(address newChair_) public onlyGov {
         sendMessage(abi.encodeWithSignature("changeChair(address)", newChair_));
+    }
+
+    function changeGuardian(address newGuardian_) public onlyGov {
+        sendMessage(abi.encodeWithSignature("changeGuardian(address)", newGuardian_));
     }
 
     function changeL2Chair(address newChair_) public onlyGov {
@@ -196,5 +200,9 @@ contract VeloFarmerMessenger {
 
     function changeMessengerChair(address newChair_) public onlyGov {
         chair = newChair_;
+    }
+
+    function changeMessengerGuardian(address newGuardian_) public onlyGov {
+        guardian = newGuardian_;
     }
 }
