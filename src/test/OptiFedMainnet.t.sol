@@ -35,6 +35,8 @@ contract OptiFedMainnetTest is Test {
     error DeltaAboveMax();
     
     function setUp() public {
+        vm.warp(block.timestamp + 1 days);
+        
         vm.startPrank(chair);
 
         fed = new OptiFed(gov, address(0x69), 1_000_000e18);
