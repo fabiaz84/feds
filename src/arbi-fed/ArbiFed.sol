@@ -1,13 +1,14 @@
 pragma solidity ^0.8.13;
 
-import "../interfaces/IERC20.sol";
-import "../interfaces/velo/IDola.sol";
-import "../interfaces/velo/IL1ERC20Bridge.sol";
+import "src/interfaces/IERC20.sol";
+import "src/interfaces/velo/IDola.sol";
+import "src/interfaces/velo/IL1ERC20Bridge.sol";
 import {IL1GatewayRouter} from "arbitrum/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
 
 contract ArbiFed {
     address public chair;
     address public gov;
+    address public l2Chair;
     uint public underlyingSupply;
     uint public maxSlippageBpsDolaToUsdc;
     uint public maxSlippageBpsUsdcToDola;
@@ -35,11 +36,13 @@ contract ArbiFed {
     constructor(
             address gov_,
             address auraFarmer_,
+            address l2Chair_,
             uint maxDailyDelta_)
     {
         chair = msg.sender;
         gov = gov_;
         auraFarmer = auraFarmer_;
+        l2Chair = l2Chair_;
         maxDailyDelta = maxDailyDelta_; 
         lastDeltaUpdate = block.timestamp - 1 days;
 
@@ -153,24 +156,24 @@ contract ArbiFed {
     /**
     @notice Method for gov to change gov address
     */
-    function changeGov(address newGov_) external {
+    function changeGov(address newGov) external {
         if (msg.sender != gov) revert OnlyGov();
-        gov = newGov_;
+        gov = newGov;
     }
 
     /**
     @notice Method for gov to change the chair
     */
-    function changeChair(address newChair_) external {
+    function changeChair(address newChair) external {
         if (msg.sender != gov) revert OnlyGov();
-        chair = newChair_;
+        chair = newChair;
     }
 
     /**
     @notice Method for gov to change the L2 auraFarmer address
     */
-     function changeAuraFarmer(address newAuraFarmer_) external {
+     function changeAuraFarmer(address newAuraFarmer) external {
         if (msg.sender != gov) revert OnlyGov();
-        auraFarmer = newAuraFarmer_;
+        auraFarmer = newAuraFarmer;
     }
 }

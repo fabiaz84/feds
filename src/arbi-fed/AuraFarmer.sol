@@ -6,33 +6,14 @@ import "src/interfaces/aura/IAuraLocker.sol";
 import "src/interfaces/aura/IAuraBalRewardPool.sol";
 import "src/aura-fed/BalancerAdapter.sol";
 import {IL2GatewayRouter} from "src/interfaces/arbitrum/IL2GatewayRouter.sol";
+import {AddressAliasHelper} from "src/utils/AddressAliasHelper.sol";
 
 interface IAuraBooster {
     function depositAll(uint _pid, bool _stake) external;
     function withdraw(uint _pid, uint _amount) external;
 }
 
-library AddressAliasHelper {
-    uint160 constant offset = uint160(0x1111000000000000000000000000000000001111);
-
-    /// @notice Utility function that converts the address in the L1 that submitted a tx to
-    /// the inbox to the msg.sender viewed in the L2
-    /// @param l1Address the address in the L1 that triggered the tx to L2
-    /// @return l2Address L2 address as viewed in msg.sender
-    function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Address) {
-        l2Address = address(uint160(l1Address) + offset);
-    }
-
-    /// @notice Utility function that converts the msg.sender viewed in the L2 to the
-    /// address in the L1 that submitted a tx to the inbox
-    /// @param l2Address L2 address as viewed in msg.sender
-    /// @return l1Address the address in the L1 that triggered the tx to L2
-    function undoL1ToL2Alias(address l2Address) internal pure returns (address l1Address) {
-        l1Address = address(uint160(l2Address) - offset);
-    }
-}
-
-contract AuraFarmer is BalancerComposableStablepoolAdapter{
+contract AuraFarmer is BalancerComposableStablepoolAdapter {
 
     IAuraBalRewardPool public dolaBptRewardPool;
     IAuraBooster public booster;
@@ -118,23 +99,23 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter{
     /**
     @notice Method for gov to change gov address
     */
-    function changeGov(address newGov_) onlyGov external {
-        gov = newGov_;
+    function changeGov(address newGov) onlyGov external {
+        gov = newGov;
     }
 
     /**
     @notice Method for gov to change the chair
     */
-    function changeChair(address newChair_) onlyGov external {
-        chair = newChair_;
+    function changeChair(address newChair) onlyGov external {
+        chair = newChair;
     }
 
-    function changeArbiFedL1(address newArbiFedL1_) onlyGov external {
-        arbiFedL1 = newArbiFedL1_;
+    function changeArbiFedL1(address newArbiFedL1) onlyGov external {
+        arbiFedL1 = newArbiFedL1;
     }
 
-    function changeArbiMessengerL1(address newArbiMessengerL1_) onlyGov external {
-        arbiMessengerL1 = newArbiMessengerL1_;
+    function changeArbiMessengerL1(address newArbiMessengerL1) onlyGov external {
+        arbiMessengerL1 = newArbiMessengerL1;
     }
 
     /**
@@ -205,12 +186,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter{
         uint dolaWithdrawn = _withdraw(amountDola, maxLossWithdrawBps);
         require(dolaWithdrawn > 0, "Nothing withdrawn");
 
-        if(dolaWithdrawn >= dolaDeposited) {
-            dolaDeposited = 0;
-            dolaProfit += dolaWithdrawn - dolaDeposited;
-        } else {
-            dolaDeposited -= dolaWithdrawn;
-        }
+        _updateDolaDeposited(dolaWithdrawn);
 
         emit Withdraw(dolaWithdrawn);
     }
@@ -225,12 +201,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter{
         uint dolaWithdrawn = _withdrawAll(maxLossWithdrawBps);
         require(dolaWithdrawn > 0, "Nothing withdrawn");
 
-        if(dolaWithdrawn >= dolaDeposited) {
-            dolaDeposited = 0;
-            dolaProfit += dolaWithdrawn - dolaDeposited;
-        } else {
-            dolaDeposited -= dolaWithdrawn;
-        }
+        _updateDolaDeposited(dolaWithdrawn);
 
         emit Withdraw(dolaWithdrawn);
     }
@@ -286,5 +257,14 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter{
     */
     function bptSupply() public view returns(uint){
         return IERC20(bpt).balanceOf(address(this)) + dolaBptRewardPool.balanceOf(address(this));
+    }
+
+    function _updateDolaDeposited(uint dolaWithdrawn) internal {   
+       if(dolaWithdrawn >= dolaDeposited) {
+            dolaDeposited = 0;
+            dolaProfit += dolaWithdrawn - dolaDeposited;
+        } else {
+            dolaDeposited -= dolaWithdrawn;
+        }
     }
 }
