@@ -15,13 +15,26 @@ interface IAuraBooster {
 
 contract AuraFarmer is BalancerComposableStablepoolAdapter {
 
+    error ExpansionMaxLossTooHigh();
+    error WithdrawMaxLossTooHigh();
+    error TakeProfitMaxLossTooHigh();
+    error OnlyL2Chair();
+    error OnlyL2Gov();
+    error MaxSlippageTooHigh();
+    error NotEnoughTokens();
+    error NotEnoughBPT();
+    error AuraWithdrawFailed();
+    error NothingWithdrawn();
+    error OnlyChairCanTakeBPTProfit();
+    error NoProfit();
+    error GettingRewardFailed();
+
     IAuraBalRewardPool public dolaBptRewardPool;
     IAuraBooster public booster;
    
-    address public chair; // Fed Chair
     address public l2chair;
-    address public guardian;
-    address public gov;
+    address public l2gov;
+
     uint public dolaDeposited; // TODO: use this to calculate the amount of DOLA to deposit and if we have profit
     uint public dolaProfit; // TODO: review this variable accounting
     uint public constant pid = 8; // TODO: use proper pid , Gauge pid, should never change 
@@ -41,16 +54,11 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     IERC20 public immutable aura = IERC20(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
 
     address public arbiFedL1;
-    address public arbiMessengerL1;
+    address public arbiGovMessengerL1;
 
     event Deposit(uint amount);
     event Withdraw(uint amount);
 
-    error OnlyChair();
-    error OnlyGov();
-    error OnlyArbiMessengerL1();
-    error MaxSlippageTooHigh();
-    error NotEnoughTokens();
 
     // TODO: reformat constructor, add arbi fed and messenger
     constructor(
@@ -58,19 +66,18 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
             address vault_,
             address dolaBptRewardPool_, 
             address booster_,
-            address chair_,
-            address guardian_,
-            address gov_, 
+            address l2chair_,
+            address l2gov_, 
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
             uint maxLossTakeProfitBps_,
             bytes32 poolId_
             ) 
             BalancerComposableStablepoolAdapter(poolId_, dola_, vault_)
-    {
-        require(maxLossExpansionBps_ < 10000, "Expansion max loss too high");
-        require(maxLossWithdrawBps_ < 10000, "Withdraw max loss too high");
-        require(maxLossTakeProfitBps_ < 10000, "TakeProfit max loss too high");
+    {   
+        if(maxLossExpansionBps_ >= 10000) revert ExpansionMaxLossTooHigh();
+        if(maxLossWithdrawBps_ >= 10000) revert WithdrawMaxLossTooHigh();
+        if(maxLossTakeProfitBps_ >= 10000) revert TakeProfitMaxLossTooHigh();
         dolaBptRewardPool = IAuraBalRewardPool(dolaBptRewardPool_);
         booster = IAuraBooster(booster_);
         bal = IERC20(dolaBptRewardPool.rewardToken());
@@ -79,20 +86,17 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         maxLossExpansionBps = maxLossExpansionBps_;
         maxLossWithdrawBps = maxLossWithdrawBps_;
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
-        chair = chair_;
-        gov = gov_;
-        guardian = guardian_;
+        l2chair = l2chair_;
+        l2gov = l2gov_;
     }
 
-    // TODO: update modifiers with proper gov chair and messenger 
-    // TODO: review gov chair guardian roles
     modifier onlyGov() {
-        if(AddressAliasHelper.undoL1ToL2Alias(msg.sender) != arbiMessengerL1) revert OnlyArbiMessengerL1();
+        if(l2gov != msg.sender) revert OnlyL2Gov();
         _;
     }
 
     modifier onlyChair() {
-        if(AddressAliasHelper.undoL1ToL2Alias(msg.sender) != arbiMessengerL1) revert OnlyArbiMessengerL1();
+        if(l2chair != msg.sender) revert OnlyL2Chair();
         _;
     }
 
@@ -100,56 +104,46 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     @notice Method for gov to change gov address
     */
     function changeGov(address newGov) onlyGov external {
-        gov = newGov;
+        l2gov = newGov;
     }
 
     /**
     @notice Method for gov to change the chair
     */
-    function changeChair(address newChair) onlyGov external {
-        chair = newChair;
+    function changeL2Chair(address newL2Chair) onlyGov external {
+        l2chair = newL2Chair;
     }
 
     function changeArbiFedL1(address newArbiFedL1) onlyGov external {
         arbiFedL1 = newArbiFedL1;
     }
 
-    function changeArbiMessengerL1(address newArbiMessengerL1) onlyGov external {
-        arbiMessengerL1 = newArbiMessengerL1;
+    function changeArbiGovMessengerL1(address newArbiGovMessengerL1) onlyGov external {
+        arbiGovMessengerL1 = newArbiGovMessengerL1;
     }
 
     /**
-    @notice Method for current chair of the Aura FED to resign
+    @notice Method for current chair of the Aura Farmer to resign
     */
     function resign() onlyChair external {
-        chair = address(0);
+        l2chair = address(0);
     }
 
     function setMaxLossExpansionBps(uint newMaxLossExpansionBps) onlyGov external {
-        require(newMaxLossExpansionBps <= 10000, "Can't have max loss above 100%");
+        if(newMaxLossExpansionBps >= 10000) revert ExpansionMaxLossTooHigh();
         maxLossExpansionBps = newMaxLossExpansionBps;
     }
 
-    function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) external {
-        require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == arbiMessengerL1 || msg.sender == guardian, "ONLY GOV OR CHAIR");
-        if(msg.sender == guardian){
-            //We limit the max loss a guardian, as we only want governance to be able to set a very high maxloss 
-            require(newMaxLossWithdrawBps <= maxLossSetableByGuardian, "Above allowed maxloss for chair");
-        }
-        require(newMaxLossWithdrawBps <= 10000, "Can't have max loss above 100%");
+    function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) onlyGov external  {
+        if(newMaxLossWithdrawBps >= 10000) revert WithdrawMaxLossTooHigh();
         maxLossWithdrawBps = newMaxLossWithdrawBps;
     }
 
     function setMaxLossTakeProfitBps(uint newMaxLossTakeProfitBps) onlyGov external {
-        require(newMaxLossTakeProfitBps <= 10000, "Can't have max loss above 100%");
+        if(newMaxLossTakeProfitBps >= 10000) revert TakeProfitMaxLossTooHigh();
         maxLossTakeProfitBps = newMaxLossTakeProfitBps;   
     }
 
-    function setMaxLossSetableByGuardian(uint newMaxLossSetableByGuardian) external {
-        require(msg.sender == guardian, "ONLY GOV OR CHAIR");
-        require(newMaxLossSetableByGuardian < 10000);
-        maxLossSetableByGuardian = newMaxLossSetableByGuardian;
-    }
     /**
     @notice Deposits amount of dola tokens into balancer, before locking with aura
     @param amount Amount of dola token to deposit
@@ -173,18 +167,16 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     may have outperformed price of dola token.
     */
     function withdrawLiquidity(uint amountDola) onlyChair external {
-        require(msg.sender == chair, "ONLY CHAIR");
         //Calculate how many lp tokens are needed to withdraw the dola
         uint bptNeeded = bptNeededForDola(amountDola);
-        require(bptNeeded <= bptSupply(), "Not enough BPT tokens");
+        if(bptNeeded > bptSupply()) revert NotEnoughBPT();
 
         //Withdraw BPT tokens from aura, but don't claim rewards
-        require(dolaBptRewardPool.withdrawAndUnwrap(bptNeeded, false), "AURA WITHDRAW FAILED");
-
+        if(!dolaBptRewardPool.withdrawAndUnwrap(bptNeeded, false)) revert AuraWithdrawFailed();
 
         //Withdraw DOLA from balancer pool
         uint dolaWithdrawn = _withdraw(amountDola, maxLossWithdrawBps);
-        require(dolaWithdrawn > 0, "Nothing withdrawn");
+        if(dolaWithdrawn == 0) revert NothingWithdrawn();
 
         _updateDolaDeposited(dolaWithdrawn);
 
@@ -197,9 +189,9 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     */
     function withdrawAllLiquidity() onlyChair external {
   
-        require(dolaBptRewardPool.withdrawAndUnwrap(dolaBptRewardPool.balanceOf(address(this)), false), "AURA WITHDRAW FAILED");
+        if(!dolaBptRewardPool.withdrawAndUnwrap(dolaBptRewardPool.balanceOf(address(this)), false)) revert AuraWithdrawFailed();
         uint dolaWithdrawn = _withdrawAll(maxLossWithdrawBps);
-        require(dolaWithdrawn > 0, "Nothing withdrawn");
+        if(dolaWithdrawn == 0) revert NothingWithdrawn();
 
         _updateDolaDeposited(dolaWithdrawn);
 
@@ -218,19 +210,19 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
 
         uint bptValue = bptSupply() * bpt.getRate() / 10**18;
         if(harvestLP && bptValue > dolaDeposited) {
-            require(msg.sender == chair, "ONLY CHAIR CAN TAKE BPT PROFIT");
+            if(msg.sender != l2chair) revert OnlyChairCanTakeBPTProfit();
             uint dolaSurplus = bptValue - dolaDeposited;
             uint bptToWithdraw = bptNeededForDola(dolaSurplus);
             if(bptToWithdraw > dolaBptRewardPool.balanceOf(address(this))){
                 bptToWithdraw = dolaBptRewardPool.balanceOf(address(this));
             }
-            require(dolaBptRewardPool.withdrawAndUnwrap(bptToWithdraw, false), "AURA WITHDRAW FAILED");
+            if(!dolaBptRewardPool.withdrawAndUnwrap(bptToWithdraw, false)) revert AuraWithdrawFailed();
             uint dolaProfit_ = _withdraw(dolaSurplus, maxLossTakeProfitBps);
-            require(dolaProfit_ > 0, "NO PROFIT");
+            if(dolaProfit_ == 0) revert NoProfit();
             dolaProfit += dolaProfit_;
         }
 
-        require(dolaBptRewardPool.getReward(address(this), true), "Getting reward failed");
+        if(!dolaBptRewardPool.getReward(address(this), true)) revert GettingRewardFailed();
     }
     
     // Bridiging back to L1 TODO: review this bridging code

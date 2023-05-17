@@ -10,16 +10,14 @@ contract ArbiFed {
     address public gov;
     address public l2Chair;
     uint public underlyingSupply;
-    uint public maxSlippageBpsDolaToUsdc;
-    uint public maxSlippageBpsUsdcToDola;
     uint public lastDeltaUpdate;
     uint public maxDailyDelta;
     uint private dailyDelta;
 
-    uint constant PRECISION = 10_000;
-
     IDola public immutable DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IL1GatewayRouter public immutable gatewayRouter = IL1GatewayRouter(0x72Ce9c846789fdB6fC1f34aC4AD25Dd9ef7031ef); 
+    IL1GatewayRouter  public immutable gateway = IL1GatewayRouter(0xb4299A1F5f26fF6a98B7BA35572290C359fde900);
+    address public immutable l1ERC20Gateway = 0xa3A7B6F88361F48403514059F1F16C8E78d60EeC;
 
     address public auraFarmer; // On L2
 
@@ -29,7 +27,6 @@ contract ArbiFed {
     error OnlyGov();
     error OnlyChair();
     error CantBurnZeroDOLA();
-    error MaxSlippageTooHigh();
     error DeltaAboveMax();
     error ZeroGasPriceBid();
     
@@ -46,14 +43,14 @@ contract ArbiFed {
         maxDailyDelta = maxDailyDelta_; 
         lastDeltaUpdate = block.timestamp - 1 days;
 
-        DOLA.approve(address(gatewayRouter), type(uint).max);
+        DOLA.approve(address(l1ERC20Gateway), type(uint).max); 
     }
 
     /**
     @notice Mints & deposits `amountUnderlying` of `underlying` tokens into Arbitrum Gateway to the `auraFarmer` contract
     @param amountUnderlying Amount of underlying token to mint & deposit into Aura farmer on Arbitrum
     */
-    function expansion(uint amountUnderlying, uint256 gasLimit, uint256 gasPriceBid) external {
+    function expansion(uint amountUnderlying, uint256 gasLimit, uint256 gasPriceBid, bytes memory data) external payable {
         if (msg.sender != chair) revert OnlyChair();
         if (gasPriceBid == 0) revert ZeroGasPriceBid();
 
@@ -61,14 +58,14 @@ contract ArbiFed {
         underlyingSupply += amountUnderlying;
         DOLA.mint(address(this), amountUnderlying);
 
-        gatewayRouter.outboundTransferCustomRefund(
+        gatewayRouter.outboundTransferCustomRefund{value: msg.value}(
         address(DOLA),
-        auraFarmer,// where should we refund excess L2 gas? 
+        l2Chair,// where should we refund excess L2 gas? 
         auraFarmer,
         DOLA.balanceOf(address(this)),
         gasLimit, 
         gasPriceBid, 
-        ""
+        data
     );
 
         emit Expansion(amountUnderlying);
