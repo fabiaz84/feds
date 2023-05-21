@@ -37,7 +37,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
 
     uint public dolaDeposited; // TODO: use this to calculate the amount of DOLA to deposit and if we have profit
     uint public dolaProfit; // TODO: review this variable accounting
-    uint public constant pid = 8; // TODO: use proper pid , Gauge pid, should never change 
+    uint public constant pid = 45; // TODO: USDC-DOLA Aura pool id
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
@@ -49,8 +49,8 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     IERC20 public immutable auraL1 = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     IERC20 public immutable balL1 = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
 
-    // TODO: update addresses
-    IERC20 public bal = IERC20(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
+    // TODO: update addresses for Arbitrum
+    IERC20 public bal; // = IERC20(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
     IERC20 public immutable aura = IERC20(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
 
     address public arbiFedL1;

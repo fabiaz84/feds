@@ -82,4 +82,11 @@ interface IVault {
         uint256 limit,
         uint256 deadline
     ) external payable returns (uint256);
+
+    enum JoinKind {
+        INIT,
+        EXACT_TOKENS_IN_FOR_BPT_OUT,
+        TOKEN_IN_FOR_EXACT_BPT_OUT
+    }
+    
 }
