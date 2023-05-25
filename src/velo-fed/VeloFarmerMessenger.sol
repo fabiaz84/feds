@@ -1,6 +1,46 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "../interfaces/velo/ICrossDomainMessenger.sol";
+/**
+ * @title ICrossDomainMessenger
+ */
+interface ICrossDomainMessenger {
+    /**********
+     * Events *
+     **********/
+
+    event SentMessage(
+        address indexed target,
+        address sender,
+        bytes message,
+        uint256 messageNonce,
+        uint256 gasLimit
+    );
+    event RelayedMessage(bytes32 indexed msgHash);
+    event FailedRelayedMessage(bytes32 indexed msgHash);
+
+    /*************
+     * Variables *
+     *************/
+
+    function xDomainMessageSender() external view returns (address);
+
+    /********************
+     * Public Functions *
+     ********************/
+
+    /**
+     * Sends a cross domain message to the target messenger.
+     * @param _target Target contract address.
+     * @param _message Message to send to the target.
+     * @param _gasLimit Gas limit for the provided message.
+     */
+    function sendMessage(
+        address _target,
+        bytes calldata _message,
+        uint32 _gasLimit
+    ) external;
+}
 
 contract VeloFarmerMessenger {
     ICrossDomainMessenger constant crossDomainMessenger = ICrossDomainMessenger(0x25ace71c97B33Cc4729CF772ae268934F7ab5fA1);
@@ -10,6 +50,8 @@ contract VeloFarmerMessenger {
     address public pendingGov;
     address public guardian;
     address public chair;
+
+    uint32 public gasLimit = 750_000;
 
     constructor(address gov_, address chair_, address guardian_, address veloFed_) {
         gov = gov_;
@@ -24,7 +66,7 @@ contract VeloFarmerMessenger {
     }
 
     modifier onlyGovOrGuardian {
-        if (msg.sender != gov || msg.sender != guardian) revert OnlyGov();
+        if (msg.sender != gov && msg.sender != guardian) revert OnlyGov();
         _;
     }
 
@@ -46,7 +88,7 @@ contract VeloFarmerMessenger {
     //Helper functions
 
     function sendMessage(bytes memory message) internal {
-        crossDomainMessenger.sendMessage(address(veloFed), message, 0);
+        crossDomainMessenger.sendMessage(address(veloFed), message, gasLimit);
     }
 
     //Gov Messaging functions
@@ -77,6 +119,10 @@ contract VeloFarmerMessenger {
 
     function changeChair(address newChair_) public onlyGov {
         sendMessage(abi.encodeWithSignature("changeChair(address)", newChair_));
+    }
+
+    function changeGuardian(address newGuardian_) public onlyGov {
+        sendMessage(abi.encodeWithSignature("changeGuardian(address)", newGuardian_));
     }
 
     function changeL2Chair(address newChair_) public onlyGov {
@@ -139,6 +185,10 @@ contract VeloFarmerMessenger {
 
     //Gov functions
 
+    function setGasLimit(uint32 newGasLimit_) public onlyGov {
+        gasLimit = newGasLimit_;
+    }
+
     function setPendingMessengerGov(address newPendingGov_) public onlyGov {
         pendingGov = newPendingGov_;
     }
@@ -148,7 +198,11 @@ contract VeloFarmerMessenger {
         pendingGov = address(0);
     }
 
-    function changeMessengerChair(address newChair_) public onlyChair {
+    function changeMessengerChair(address newChair_) public onlyGov {
         chair = newChair_;
+    }
+
+    function changeMessengerGuardian(address newGuardian_) public onlyGov {
+        guardian = newGuardian_;
     }
 }

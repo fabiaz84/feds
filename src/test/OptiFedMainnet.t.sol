@@ -5,7 +5,7 @@ import "ds-test/test.sol";
 import "forge-std/Test.sol";
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { IDola } from "../interfaces/velo/IDola.sol";
-import "../velo-fed/VeloFarmer.sol";
+import {VeloFarmer} from "../velo-fed/VeloFarmer.sol";
 import {OptiFed} from "../velo-fed/OptiFed.sol";
 import "../interfaces/velo/ICurvePool.sol";
 
