@@ -46,12 +46,21 @@ contract ArbiFed {
         DOLA.approve(address(l1ERC20Gateway), type(uint).max); 
     }
 
+    modifier onlyGov {
+        if (msg.sender != gov) revert OnlyGov();
+        _;
+    }
+
+    modifier onlyChair {
+        if (msg.sender != chair) revert OnlyChair();
+        _;
+    }
+
     /**
     @notice Mints & deposits `amountUnderlying` of `underlying` tokens into Arbitrum Gateway to the `auraFarmer` contract
     @param amountUnderlying Amount of underlying token to mint & deposit into Aura farmer on Arbitrum
     */
-    function expansion(uint amountUnderlying, uint256 gasLimit, uint256 gasPriceBid, bytes memory data) external payable {
-        if (msg.sender != chair) revert OnlyChair();
+    function expansion(uint amountUnderlying, uint256 gasLimit, uint256 gasPriceBid, bytes memory data) external payable onlyChair {
         if (gasPriceBid == 0) revert ZeroGasPriceBid();
 
         _updateDailyDelta(amountUnderlying);
@@ -74,8 +83,7 @@ contract ArbiFed {
     /**
     @notice Burns `amountUnderlying` of DOLA held in this contract
     */
-    function contraction(uint amountUnderlying) public {
-        if (msg.sender != chair) revert OnlyChair();
+    function contraction(uint amountUnderlying) external onlyChair {
 
         _contraction(amountUnderlying);
     }
@@ -83,8 +91,7 @@ contract ArbiFed {
     /**
     @notice Attempts to contract (burn) all DOLA held by this contract
     */
-    function contractAll() external {
-        if (msg.sender != chair) revert OnlyChair();
+    function contractAll() external onlyChair {
 
         _contraction(DOLA.balanceOf(address(this)));
     }
@@ -111,8 +118,7 @@ contract ArbiFed {
     /**
     @notice Method for current chair of the Arbi FED to resign
     */
-    function resign() external {
-        if (msg.sender != chair) revert OnlyChair();
+    function resign() external onlyChair {
         chair = address(0);
     }
     
@@ -137,8 +143,7 @@ contract ArbiFed {
     @notice Governance only function for setting maximum daily DOLA supply delta allowed for the fed
     @param newMaxDailyDelta The new maximum amount underlyingSupply can be expanded or contracted in a day
     */
-    function setMaxDailyDelta(uint newMaxDailyDelta) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function setMaxDailyDelta(uint newMaxDailyDelta) external onlyGov {
         maxDailyDelta = newMaxDailyDelta;
     }
 
@@ -153,24 +158,29 @@ contract ArbiFed {
     /**
     @notice Method for gov to change gov address
     */
-    function changeGov(address newGov) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function changeGov(address newGov) external onlyGov {
         gov = newGov;
     }
 
     /**
     @notice Method for gov to change the chair
     */
-    function changeChair(address newChair) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function changeChair(address newChair) external onlyGov {
         chair = newChair;
     }
 
     /**
     @notice Method for gov to change the L2 auraFarmer address
     */
-     function changeAuraFarmer(address newAuraFarmer) external {
-        if (msg.sender != gov) revert OnlyGov();
+    function changeAuraFarmer(address newAuraFarmer) external onlyGov {
         auraFarmer = newAuraFarmer;
     }
+
+    /**
+    @notice Method for gov to withdraw any ERC20 token from this contract
+    */
+    function emergecyWithdraw(address token, address to, uint256 amount) external onlyGov {
+        IERC20(token).transfer(to, amount);
+    }
+    
 }

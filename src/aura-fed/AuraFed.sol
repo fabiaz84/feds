@@ -30,36 +30,41 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     event Expansion(uint amount);
     event Contraction(uint amount);
 
+    struct InitialAddresses {
+        address dola;
+        address aura;
+        address vault;
+        address dolaBptRewardPool;
+        address bpt;
+        address booster;
+        address chair;
+        address guardian;
+        address gov;
+    }
+
     constructor(
-            address dola_, 
-            address aura_,
-            address vault_,
-            address dolaBptRewardPool_, 
-            address booster_,
-            address chair_,
-            address guardian_,
-            address gov_, 
+            InitialAddresses memory addresses_,
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
             uint maxLossTakeProfitBps_,
             bytes32 poolId_) 
-            BalancerComposableStablepoolAdapter(poolId_, dola_, vault_)
+            BalancerComposableStablepoolAdapter(poolId_, addresses_.dola, addresses_.vault, addresses_.bpt)
     {
         require(maxLossExpansionBps_ < 10000, "Expansion max loss too high");
         require(maxLossWithdrawBps_ < 10000, "Withdraw max loss too high");
         require(maxLossTakeProfitBps_ < 10000, "TakeProfit max loss too high");
-        dolaBptRewardPool = IAuraBalRewardPool(dolaBptRewardPool_);
-        booster = IAuraBooster(booster_);
-        aura = IERC20(aura_);
-        bal = IERC20(dolaBptRewardPool.rewardToken());
-        (address bpt,) = IVault(vault_).getPool(poolId_);
-        IERC20(bpt).approve(booster_, type(uint256).max);
+        dolaBptRewardPool = IAuraBalRewardPool(addresses_.dolaBptRewardPool);
+        booster = IAuraBooster(addresses_.booster);
+        aura = IERC20(addresses_.aura);
+        bal = IERC20(address(IAuraBalRewardPool(addresses_.dolaBptRewardPool).rewardToken()));
+        (address bpt,) = IVault(addresses_.vault).getPool(poolId_);
+        IERC20(bpt).approve(addresses_.booster, type(uint256).max);
         maxLossExpansionBps = maxLossExpansionBps_;
         maxLossWithdrawBps = maxLossWithdrawBps_;
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
-        chair = chair_;
-        gov = gov_;
-        guardian = guardian_;
+        chair = addresses_.chair;
+        gov = addresses_.gov;
+        guardian = addresses_.guardian;
     }
 
     /**

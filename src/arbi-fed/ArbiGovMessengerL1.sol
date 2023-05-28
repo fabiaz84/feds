@@ -27,7 +27,7 @@ contract ArbiGovMessengerL1 {
         if (msg.sender != gov) revert OnlyGov();
         _;
     }
-
+    
     function sendMessage(
         address _inbox,
         address _to,

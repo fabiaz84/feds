@@ -25,6 +25,8 @@ interface IGaugeFactory {
 
 interface IAuraBooster {
     function addPool(address _pool, address _gauge, uint256 _stashVersion) external returns (bool);
+    function poolLength() external view returns (uint256);
+    function poolInfo(uint256 _pid) external view returns (address, address,address,address,address,bool);
 }
 
 interface IGaugeAdder {
@@ -36,16 +38,32 @@ interface IGaugeController {
 }
 
 contract AuraFarmerTest is Test {
+
+    error ExpansionMaxLossTooHigh();
+    error WithdrawMaxLossTooHigh();
+    error TakeProfitMaxLossTooHigh();
+    error OnlyL2Chair();
+    error OnlyL2Gov();
+    error MaxSlippageTooHigh();
+    error NotEnoughTokens();
+    error NotEnoughBPT();
+    error AuraWithdrawFailed();
+    error NothingWithdrawn();
+    error OnlyChairCanTakeBPTProfit();
+    error NoProfit();
+    error GettingRewardFailed();
+
     //Tokens
     IDola public DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 public USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     IERC20 bpt = IERC20(0xFf4ce5AAAb5a627bf82f4A571AB1cE94Aa365eA6); // USDC-DOLA bal pool
     IERC20 bal = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
     IERC20 aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
+
     IVault vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
-    IAuraBalRewardPool baseRewardPool =
-        IAuraBalRewardPool(0x99653d46D52eE41c7b35cbAd1aC408A00bad6A76);
+    IAuraBalRewardPool baseRewardPool;
     address booster = 0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
+
     address gauge;
     address gaugeAdder = 0x5efBb12F01f27F0E020565866effC1dA491E91A4;
     address gaugeController = 0xC128468b7Ce63eA702C1f104D55A2566b13D3ABD;
@@ -75,7 +93,8 @@ contract AuraFarmerTest is Test {
     address l2Gov = address(0x420);
     address gov = 0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
     address usdcUser = 0xDa9CE944a37d218c3302F6B82a094844C6ECEb17;
-    
+    ArbiGovMessengerL1 arbiGovMessengerL1;
+    address arbiFedL1 = address(0x23);
     //Numbas
     uint dolaAmount = 100_000e18;
     uint usdcAmount = 100_000e6;
@@ -87,6 +106,8 @@ contract AuraFarmerTest is Test {
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 17228840);
+
+        arbiGovMessengerL1 = new ArbiGovMessengerL1(gov);
 
         // Create balancer pool for DOLA-USDC
 
@@ -170,35 +191,94 @@ contract AuraFarmerTest is Test {
         // vm.prank(0xc38c5f97B34E175FFd35407fc91a937300E33860); 
         // IGaugeAdder(gaugeAdder).addEthereumGauge(gauge);
 
+        console.log(IAuraBooster(booster).poolLength(),'pool id for aura');
+
         vm.prank(0x2c809Ec701C088099c911AF9DdfA4A1Db6110F3c); // Booster Pool Manager
         bool added = IAuraBooster(booster).addPool(address(pool), gauge, 3);
-        console.log(added);
+        assertTrue(added);
 
-
-        // Deploy Aura Farmer
-        auraFarmer = new AuraFarmer(
+        (address lpToken,address token,address crvRewards,address stash,,bool isShut) = IAuraBooster(booster).poolInfo(93);
+        assertFalse(isShut);
+      
+        console.log(IAuraBalRewardPool(stash).rewardToken(),'bal token as reward');
+        
+        AuraFarmer.InitialAddresses memory addresses = AuraFarmer.InitialAddresses(
             address(DOLA),
             address(vault),
-            address(baseRewardPool),
+            stash,
+            address(pool), // BPT
             booster,
             l2Chair,
             l2Gov,
+            arbiFedL1,
+            address(arbiGovMessengerL1)
+        );
+
+        // Deploy Aura Farmer
+        auraFarmer = new AuraFarmer(
+            addresses,
             maxLossExpansion,
             maxLossWithdraw,
             maxLossTakeProfit,
             poolId
         );
 
-
+        // Simulate Arbitrum bridging into AuraFarmer for DOLA
+        vm.prank(gov);
+        DOLA.mint(address(auraFarmer), dolaAmount); 
     }
 
     function test_deposit() public {
-    
-        vm.prank(gov);
-        DOLA.mint(address(auraFarmer), dolaAmount);
-
+        // Deposit DOLA into strategy
         vm.prank(l2Chair);
         auraFarmer.deposit(dolaAmount);
+
+        assertEq(DOLA.balanceOf(address(auraFarmer)), 0);
     }
 
+    function test_withdrawLiquidity() public {
+        vm.startPrank(l2Chair);
+        auraFarmer.deposit(dolaAmount);
+
+        assertEq(auraFarmer.dolaDeposited(), dolaAmount);
+        assertEq(DOLA.balanceOf(address(auraFarmer)), 0);
+        assertEq(bpt.balanceOf(address(auraFarmer)),0);
+        
+        // Cannot withdraw full amount because of slippage when depositing and withdrawing
+        vm.expectRevert(NotEnoughBPT.selector);
+        auraFarmer.withdrawLiquidity(dolaAmount);
+
+        // Withdraw 99% of available liquidity
+        uint256 dolaWithdrawn = auraFarmer.withdrawLiquidity(dolaAmount * 99 /100);
+        assertEq(auraFarmer.dolaDeposited(), dolaAmount - dolaWithdrawn);
+
+    }
+
+    function test_withdrawLiquidityAll() public {
+        vm.startPrank(l2Chair);
+        auraFarmer.deposit(dolaAmount);
+
+        assertEq(DOLA.balanceOf(address(auraFarmer)), 0);
+        assertEq(bpt.balanceOf(address(auraFarmer)),0);
+        assertGt(IERC20(address(auraFarmer.dolaBptRewardPool())).balanceOf(address(auraFarmer)),0);
+
+        // Withdraw all available liquidity
+        uint256 dolaWithdrawn = auraFarmer.withdrawAllLiquidity();
+        assertEq(auraFarmer.dolaDeposited(), dolaAmount - dolaWithdrawn);
+    }
+
+    function test_takeProfit() public {
+        vm.startPrank(l2Chair);
+        auraFarmer.deposit(dolaAmount);
+
+        assertEq(auraFarmer.dolaProfit(), 0);
+        // We call take profit but no rewards are available, still call succeeds
+        auraFarmer.takeProfit(false);
+
+        // we can also attemp to harvest but also there are no profits, still call succeds
+        auraFarmer.takeProfit(true);
+
+        // Profit accountability is still zero
+        assertEq(auraFarmer.dolaProfit(), 0);
+    }
 }   

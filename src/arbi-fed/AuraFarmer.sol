@@ -20,7 +20,6 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     error TakeProfitMaxLossTooHigh();
     error OnlyL2Chair();
     error OnlyL2Gov();
-    error MaxSlippageTooHigh();
     error NotEnoughTokens();
     error NotEnoughBPT();
     error AuraWithdrawFailed();
@@ -32,26 +31,25 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     IAuraBalRewardPool public dolaBptRewardPool;
     IAuraBooster public booster;
    
-    address public l2chair;
-    address public l2gov;
+    address public l2Chair;
+    address public l2Gov;
 
     uint public dolaDeposited; // TODO: use this to calculate the amount of DOLA to deposit and if we have profit
     uint public dolaProfit; // TODO: review this variable accounting
-    uint public constant pid = 45; // TODO: USDC-DOLA Aura pool id
+    uint public constant pid = 93; // TODO: USDC-DOLA Aura pool id
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
-    uint public maxLossSetableByGuardian = 500;
 
     // Actual addresses
-    IL2GatewayRouter public immutable l2Gateway = IL2GatewayRouter(0x5288c571Fd7aD117beA99bF60FE0846C4E84F933); 
+    IL2GatewayRouter public immutable l2GatewayRouter = IL2GatewayRouter(0x5288c571Fd7aD117beA99bF60FE0846C4E84F933); 
     IERC20 public immutable DOLAL1 = IERC20(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IERC20 public immutable auraL1 = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     IERC20 public immutable balL1 = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
 
     // TODO: update addresses for Arbitrum
-    IERC20 public bal; // = IERC20(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
-    IERC20 public immutable aura = IERC20(0x99C9fc46f92E8a1c0deC1b1747d010903E884bE1);
+    IERC20 public immutable bal;// = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
+    IERC20 public immutable aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
 
     address public arbiFedL1;
     address public arbiGovMessengerL1;
@@ -59,44 +57,52 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     event Deposit(uint amount);
     event Withdraw(uint amount);
 
+     struct InitialAddresses {
+        address dola;
+        address vault;
+        address dolaBptRewardPool;
+        address bpt;
+        address booster;
+        address l2Chair;
+        address l2Gov;
+        address arbiFedL1;
+        address arbiGovMessengerL1;
+    }
 
-    // TODO: reformat constructor, add arbi fed and messenger
+
     constructor(
-            address dola_,
-            address vault_,
-            address dolaBptRewardPool_, 
-            address booster_,
-            address l2chair_,
-            address l2gov_, 
+            InitialAddresses memory addresses_,
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
             uint maxLossTakeProfitBps_,
             bytes32 poolId_
             ) 
-            BalancerComposableStablepoolAdapter(poolId_, dola_, vault_)
+            BalancerComposableStablepoolAdapter(poolId_, addresses_.dola, addresses_.vault, addresses_.bpt)
     {   
         if(maxLossExpansionBps_ >= 10000) revert ExpansionMaxLossTooHigh();
         if(maxLossWithdrawBps_ >= 10000) revert WithdrawMaxLossTooHigh();
         if(maxLossTakeProfitBps_ >= 10000) revert TakeProfitMaxLossTooHigh();
-        dolaBptRewardPool = IAuraBalRewardPool(dolaBptRewardPool_);
-        booster = IAuraBooster(booster_);
+        dolaBptRewardPool = IAuraBalRewardPool(addresses_.dolaBptRewardPool);
+        booster = IAuraBooster(addresses_.booster);
         bal = IERC20(dolaBptRewardPool.rewardToken());
-        (address bpt,) = IVault(vault_).getPool(poolId_);
-        IERC20(bpt).approve(booster_, type(uint256).max);
+        (address bpt,) = IVault(addresses_.vault).getPool(poolId_);
+        IERC20(bpt).approve(addresses_.booster, type(uint256).max);
         maxLossExpansionBps = maxLossExpansionBps_;
         maxLossWithdrawBps = maxLossWithdrawBps_;
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
-        l2chair = l2chair_;
-        l2gov = l2gov_;
+        l2Chair = addresses_.l2Chair;
+        l2Gov = addresses_.l2Gov;
+        arbiFedL1 = addresses_.arbiFedL1;
+        arbiGovMessengerL1 = addresses_.arbiGovMessengerL1;
     }
 
     modifier onlyGov() {
-        if(l2gov != msg.sender) revert OnlyL2Gov();
+        if(l2Gov != msg.sender) revert OnlyL2Gov();
         _;
     }
 
     modifier onlyChair() {
-        if(l2chair != msg.sender) revert OnlyL2Chair();
+        if(l2Chair != msg.sender) revert OnlyL2Chair();
         _;
     }
 
@@ -104,14 +110,14 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     @notice Method for gov to change gov address
     */
     function changeGov(address newGov) onlyGov external {
-        l2gov = newGov;
+        l2Gov = newGov;
     }
 
     /**
     @notice Method for gov to change the chair
     */
     function changeL2Chair(address newL2Chair) onlyGov external {
-        l2chair = newL2Chair;
+        l2Chair = newL2Chair;
     }
 
     function changeArbiFedL1(address newArbiFedL1) onlyGov external {
@@ -126,7 +132,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     @notice Method for current chair of the Aura Farmer to resign
     */
     function resign() onlyChair external {
-        l2chair = address(0);
+        l2Chair = address(0);
     }
 
     function setMaxLossExpansionBps(uint newMaxLossExpansionBps) onlyGov external {
@@ -166,36 +172,40 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     be withdrawn than requested, as price is calculated by debts to strategies, but strategies
     may have outperformed price of dola token.
     */
-    function withdrawLiquidity(uint amountDola) onlyChair external {
+    function withdrawLiquidity(uint256 amountDola) onlyChair external returns (uint256) {
         //Calculate how many lp tokens are needed to withdraw the dola
-        uint bptNeeded = bptNeededForDola(amountDola);
+        uint256 bptNeeded = bptNeededForDola(amountDola);
         if(bptNeeded > bptSupply()) revert NotEnoughBPT();
 
         //Withdraw BPT tokens from aura, but don't claim rewards
         if(!dolaBptRewardPool.withdrawAndUnwrap(bptNeeded, false)) revert AuraWithdrawFailed();
 
         //Withdraw DOLA from balancer pool
-        uint dolaWithdrawn = _withdraw(amountDola, maxLossWithdrawBps);
+        uint256 dolaWithdrawn = _withdraw(amountDola, maxLossWithdrawBps);
         if(dolaWithdrawn == 0) revert NothingWithdrawn();
-
+       
         _updateDolaDeposited(dolaWithdrawn);
 
         emit Withdraw(dolaWithdrawn);
+
+        return dolaWithdrawn;
     }
 
     /**
     @notice Withdraws every remaining balLP token. Can take up to maxLossWithdrawBps in loss, compared to dolaSupply.
     It will still be necessary to call takeProfit to withdraw any potential rewards.
     */
-    function withdrawAllLiquidity() onlyChair external {
+    function withdrawAllLiquidity() onlyChair external returns (uint256) {
   
         if(!dolaBptRewardPool.withdrawAndUnwrap(dolaBptRewardPool.balanceOf(address(this)), false)) revert AuraWithdrawFailed();
-        uint dolaWithdrawn = _withdrawAll(maxLossWithdrawBps);
+        uint256 dolaWithdrawn = _withdrawAll(maxLossWithdrawBps);
         if(dolaWithdrawn == 0) revert NothingWithdrawn();
 
         _updateDolaDeposited(dolaWithdrawn);
 
         emit Withdraw(dolaWithdrawn);
+
+        return dolaWithdrawn;
     }
 
     /**
@@ -210,7 +220,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
 
         uint bptValue = bptSupply() * bpt.getRate() / 10**18;
         if(harvestLP && bptValue > dolaDeposited) {
-            if(msg.sender != l2chair) revert OnlyChairCanTakeBPTProfit();
+            if(msg.sender != l2Chair) revert OnlyChairCanTakeBPTProfit();
             uint dolaSurplus = bptValue - dolaDeposited;
             uint bptToWithdraw = bptNeededForDola(dolaSurplus);
             if(bptToWithdraw > dolaBptRewardPool.balanceOf(address(this))){
@@ -232,7 +242,8 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     function withdrawToL1ArbiFed(uint dolaAmount) external onlyChair {
         if (dolaAmount > dola.balanceOf(address(this))) revert NotEnoughTokens();
 
-        l2Gateway.outboundTransfer(address(DOLAL1), arbiFedL1, dolaAmount,"");
+        bytes memory empty;
+        l2GatewayRouter.outboundTransfer(address(DOLAL1), arbiFedL1, dolaAmount, empty);
     }
 
         /**
@@ -241,7 +252,8 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     function withdrawTokensToL1(address l1Token,address l2Token, address to, uint amount) external onlyChair {
         if (amount > IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
 
-        l2Gateway.outboundTransfer(address(l1Token), to, amount, "");
+        bytes memory empty;
+        l2GatewayRouter.outboundTransfer(address(l1Token), to, amount, empty);
     }
 
     /**

@@ -2,6 +2,7 @@ pragma solidity ^0.8.13;
 
 import "src/interfaces/balancer/IVault.sol";
 import "src/interfaces/IERC20.sol";
+import {console} from "forge-std/console.sol";
 
 interface IBPT is IERC20{
     function getPoolId() external view returns (bytes32);
@@ -13,15 +14,16 @@ contract BalancerComposableStablepoolAdapter {
     uint constant BPS = 10_000;
     bytes32 immutable poolId;
     IERC20 immutable dola;
-    IBPT immutable bpt = IBPT(0x1a9e996B274147E1A4Ab0E4fbbCf043778a3AAe0);
+    IBPT immutable bpt;
     IVault immutable vault;
     IVault.FundManagement fundMan;
     
-    constructor(bytes32 poolId_, address dola_, address vault_){
+    constructor(bytes32 poolId_, address dola_, address vault_, address bpt_){
         poolId = poolId_;
         dola = IERC20(dola_);
         vault = IVault(vault_);
         dola.approve(vault_, type(uint).max);
+        bpt = IBPT(bpt_);
         bpt.approve(vault_, type(uint).max);
         fundMan.sender = address(this);
         fundMan.fromInternalBalance = false;
