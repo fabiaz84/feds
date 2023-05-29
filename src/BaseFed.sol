@@ -79,30 +79,42 @@ abstract contract BaseFed {
     // * Abstract Functions *
     // **********************
 
-    /**
-     * @notice Internal function for depositing into the underlying market
-     * @dev Must check against a max loss parameter when depositing into lossy markets
-     * @param dolaAmount Amount of dola to deposit
-     * @return claimsReceived Claims on the underlying market. Should be amount of receipt tokens or LP tokens. In case of no receipt tokens, return dolaAmount;
-     */
-    function _deposit(uint dolaAmount) internal virtual returns(uint claimsReceived);
 
     /**
-     * @notice Internal function for withdrawing from the underlying market
-     * @dev Must check against a max loss parameter when withdrawing from lossy markets
-     * @param dolaAmount Amount of dola to attempt to withdraw
-     * @return claimsUsed Amount of claims spent to withdraw from the underlying market
-     * @return dolaReceived Amount of dola received. This number may be greater or less than the dolaAmount specified
+     * @notice Function for expanding DOLA into a given fed market.
+     * @param amount Amount of DOLA to mint and expand into the fed.
+     * @dev May fail due to exceeding max loss parameters when depositing to lossy markets
      */
-    function _withdraw(uint dolaAmount) internal virtual returns(uint claimsUsed, uint dolaReceived);
+    function expansion(uint amount) onlyChair virtual external {
+        revert("NOT IMPLEMENTED");
+    }
 
-     /**
-     * @notice Internal function for withdrawing all claims from the underlying market
-     * @dev Must check against a max loss parameter when withdrawing from lossy markets
-     * @return claimsUsed Amount of claims spent to withdraw from the underlying market. Shoud always be equal to claims.
-     * @return dolaReceived Amount of dola received. This number may be greater or less than the debt of the contract.
+    /**
+     * @notice Function for contracting DOLA from the attached market, and repaying debt.
+     * @param amount Amount of DOLA to attempt to withdraw and burn, may be imprecise due to underlying contracts.
+     * @dev May fail due to exceeding max loss parameters when withdrawing from lossy markets
+     */
+    function contraction(uint amount) onlyChair virtual external {
+        revert("NOT IMPLEMENTED");
+    }
+
+    /**
+     * @notice Function for turning all claims into DOLA, burning up to the debt, and sending the rest to gov.
+     * @dev May fail due to exceeding max loss parameters when withdrawing from lossy markets
      */   
-    function _withdrawAll() internal virtual returns(uint claimsUsed, uint dolaReceived);
+    function contractAll() onlyChair virtual external {
+        revert("NOT IMPLEMENTED");
+    }
+
+
+    /**
+     * @notice Internal function for paying down debt. Should be used in all functions that pay down DOLA debt,
+     like contraction, contractAll and repayDebt.
+     * @dev Must send any surplus DOLA to gov.
+     * @dev Should be used by repayDebt, contraction and contractAll functions
+     * @param amount Amount of debt to repay.
+     */
+    function _repayDebt(uint amount) virtual internal;
 
     /**
      * @notice Funtion for taking profit from profit generating feds.
@@ -139,29 +151,6 @@ abstract contract BaseFed {
     }
 
     /**
-     * @notice Internal function for paying down debt. Should be used in all functions that pay down DOLA debt,
-     like contraction, contractAll and repayDebt.
-     * @dev Will send any surplus DOLA to gov.
-     * @dev Used by repayDebt, contraction and contractAll functions
-     * @param amount Amount of debt to repay.
-     */
-    function _repayDebt(uint amount) internal {
-        if(amount > debt){
-            uint sendAmount = amount - debt;
-            uint burnAmount = debt;
-            debt = 0;
-            DOLA.burn(burnAmount);
-            DOLA.transfer(gov, sendAmount);
-            emit Profit(address(DOLA), sendAmount);
-            emit Contraction(burnAmount);
-        } else {
-            debt -= amount;
-            DOLA.burn(amount);
-            emit Contraction(amount);
-        }
-    }
-
-    /**
      * @notice Accounting function for repaying any debt that the contract will be unable to repay itself.
      * @param amount Amount of debt to repay.
      */
@@ -171,38 +160,6 @@ abstract contract BaseFed {
         _repayDebt(amount);
     }
 
-    /**
-     * @notice Function for expanding DOLA into a given fed market.
-     * @param amount Amount of DOLA to mint and expand into the fed.
-     * @dev May fail due to exceeding max loss parameters when depositing to lossy markets
-     */
-    function expansion(uint amount) onlyChair external {
-        debt += amount;
-        DOLA.mint(address(this), amount);
-        claims += _deposit(amount);
-        emit Expansion(amount);
-    }
-
-    /**
-     * @notice Function for contracting DOLA from the attached market, and repaying debt.
-     * @param amount Amount of DOLA to attempt to withdraw and burn, may be imprecise due to underlying contracts.
-     * @dev May fail due to exceeding max loss parameters when withdrawing from lossy markets
-     */
-    function contraction(uint amount) onlyChair external {
-        (uint claimsUsed, uint dolaReceived) = _withdraw(amount);
-        claims -= claimsUsed;
-        _repayDebt(dolaReceived);
-    }
-
-    /**
-     * @notice Function for turning all claims into DOLA, burning up to the debt, and sending the rest to gov.
-     * @dev May fail due to exceeding max loss parameters when withdrawing from lossy markets
-     */   
-    function contractAll() onlyChair external virtual{
-        (uint claimsUsed, uint dolaReceived) = _withdrawAll();
-        claims -= claimsUsed;
-        _repayDebt(dolaReceived);
-    }
 
     // **********
     // * Events *
