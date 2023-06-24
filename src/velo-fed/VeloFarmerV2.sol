@@ -103,8 +103,10 @@ interface IERC20 {
 }
 
 interface IGauge {
-    function deposit(uint amount, uint tokenId) external;
-    function getReward(address account, address[] memory tokens) external;
+    //function deposit(uint amount, uint tokenId) external;
+    function deposit(uint amount) external;
+    //function getReward(address account, address[] memory tokens) external;
+    function getReward(address account) external;
     function withdraw(uint shares) external;
     function balanceOf(address account) external returns (uint);
 }
@@ -270,12 +272,16 @@ contract VeloFarmerV2 {
     uint public constant DOLA_USDC_CONVERSION_MULTI= 1e12;
     uint public constant PRECISION = 10_000;
 
-    IGauge public constant dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
-    IERC20 public constant LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
-    address public constant veloTokenAddr = 0x3c8B650257cFb5f272f799F5e2b4e65093a11a05;
-    address public constant factory = address(0); //Change to real factory
+    //IGauge public constant dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
+    IGauge public constant dolaGauge = IGauge(0xa1034Ed2C9eb616d6F7f318614316e64682e7923);
+    //IERC20 public constant LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
+    IERC20 public constant LP_TOKEN = IERC20(0xB720FBC32d60BB6dcc955Be86b98D8fD3c4bA645);
+    address public constant veloTokenAddr = 0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db;
+    //address public constant factory = 0x25CbdDb98b35ab1FF77413456B31EC81A6B6B746; //Change to real factory
+    address public constant factory = 0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a; //Change to real factory
     ICrossDomainMessenger public constant ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
-    IRouter public constant router = IRouter(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9);
+    //IRouter public constant router = IRouter(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9);
+    IRouter public constant router = IRouter(0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858);
     IERC20 public constant DOLA = IERC20(0x8aE125E8653821E851F12A49F7765db9a9ce7384);
     IERC20 public constant USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
     IL2ERC20Bridge public bridge;
@@ -346,7 +352,6 @@ contract VeloFarmerV2 {
 
     /**
     @notice Claims all VELO token rewards accrued by this contract & transfer all VELO owned by this contract to `treasury`
-    */
     function claimVeloRewards() external {
         address[] memory addr = new address[](1);
         addr[0] = veloTokenAddr;
@@ -354,17 +359,11 @@ contract VeloFarmerV2 {
 
         IERC20(addr[0]).transfer(treasury, IERC20(addr[0]).balanceOf(address(this)));
     }
-
-    /**
-    @notice Attempts to claim token rewards & transfer all reward tokens owned by this contract to `treasury`
-    @param addrs Array of token addresses to claim rewards of.
     */
-    function claimRewards(address[] calldata addrs) external onlyChair {
-        dolaGauge.getReward(address(this), addrs);
+    function claimVeloRewards() external {
+        dolaGauge.getReward(address(this));
 
-        for (uint i = 0; i < addrs.length; i++) {
-            IERC20(addrs[i]).transfer(treasury, IERC20(addrs[i]).balanceOf(address(this)));
-        }
+        IERC20(veloTokenAddr).transfer(treasury, IERC20(veloTokenAddr).balanceOf(address(this)));
     }
 
     /**
@@ -374,10 +373,13 @@ contract VeloFarmerV2 {
     */
     function deposit(uint dolaAmount, uint usdcAmount) public onlyChair {
         uint lpTokenPrice = getLpTokenPrice(false);
+        emit log_uint(1);
 
         DOLA.approve(address(router), dolaAmount);
         USDC.approve(address(router), usdcAmount);
         (uint dolaSpent, uint usdcSpent, uint lpTokensReceived) = router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, 0, 0, address(this), block.timestamp);
+        require(lpTokensReceived > 0, "No LP tokens received");
+        require(LP_TOKEN.balanceOf(address(this)) > 0, "No LP tokens received");
 
         uint totalDolaValue = dolaSpent + (usdcSpent * DOLA_USDC_CONVERSION_MULTI);
 
@@ -385,7 +387,7 @@ contract VeloFarmerV2 {
         if (lpTokensReceived < expectedLpTokens) revert LiquiditySlippageTooHigh();
         
         LP_TOKEN.approve(address(dolaGauge), LP_TOKEN.balanceOf(address(this)));
-        dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)), 0);
+        dolaGauge.deposit(LP_TOKEN.balanceOf(address(this)));
     }
 
     /**
@@ -476,9 +478,10 @@ contract VeloFarmerV2 {
         uint minOut = usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
 
         USDC.approve(address(router), usdcAmount);
+        emit log_uint(getRoute(address(DOLA), address(USDC)).length);
         router.swapExactTokensForTokens(usdcAmount, minOut, getRoute(address(USDC), address(DOLA)), address(this), block.timestamp);
     }
-
+    event log_uint(uint);
     /**
     @notice Swap `dolaAmount` of DOLA to USDC through velodrome.
     @param dolaAmount Amount of DOLA to swap to USDC
@@ -487,6 +490,7 @@ contract VeloFarmerV2 {
         uint minOut = dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         
         DOLA.approve(address(router), dolaAmount);
+        emit log_uint(getRoute(address(DOLA), address(USDC)).length);
         router.swapExactTokensForTokens(dolaAmount, minOut, getRoute(address(DOLA), address(USDC)), address(this), block.timestamp);
     }
 
@@ -515,7 +519,7 @@ contract VeloFarmerV2 {
      */
     function getRoute(address from, address to) internal pure returns(IRouter.Route[] memory){
         IRouter.Route memory route = IRouter.Route(from, to, true, factory);
-        IRouter.Route[] memory routeArray;
+        IRouter.Route[] memory routeArray = new IRouter.Route[](1);
         routeArray[0] = route;
         return routeArray;
     }
