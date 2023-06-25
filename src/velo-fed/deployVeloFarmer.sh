@@ -5,4 +5,4 @@ forge create --rpc-url $1 \
     --private-key $3 \
     --etherscan-api-key $2 \
     --verify \
-    src/velo-fed/VeloFarmer.sol:VeloFarmer
+    src/velo-fed/VeloFarmerV2.sol:VeloFarmerV2

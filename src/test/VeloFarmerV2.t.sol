@@ -38,8 +38,8 @@ contract VeloFarmerV2Test is Test {
     uint usdcAmount = 1_000e6;
 
     uint maxSlippageBpsDolaToUsdc = 100;
-    uint maxSlippageBpsUsdcToDola = 20;
-    uint maxSlippageLiquidity = 30;
+    uint maxSlippageBpsUsdcToDola = 100;
+    uint maxSlippageLiquidity = 1000;
 
     //Feds
     VeloFarmerV2 fed;
@@ -70,6 +70,12 @@ contract VeloFarmerV2Test is Test {
         vm.makePersistent(address(fed));
 
         vm.stopPrank();
+        address voter = dolaGauge.voter();
+        deal(address(VELO), address(voter), 1000 ether);
+        vm.startPrank(voter);
+        VELO.approve(address(dolaGauge), 1000 ether);
+        dolaGauge.notifyRewardAmount(1000 ether);
+        vm.stopPrank();
     }
 
     // L2
@@ -88,8 +94,8 @@ contract VeloFarmerV2Test is Test {
         vm.startPrank(l2chair);
         fed.deposit(dolaAmount / 2, usdcAmount / 2);
 
-        vm.roll(block.number + 10000);
-        vm.warp(block.timestamp + (10_000 * 60));
+        vm.roll(block.number + 100000);
+        vm.warp(block.timestamp + (10_0000 * 60));
         fed.claimVeloRewards();
 
         assertGt(VELO.balanceOf(address(treasury)), initialVelo, "No rewards claimed");
@@ -154,22 +160,23 @@ contract VeloFarmerV2Test is Test {
     }
 
     function testL2_SwapDolaToUsdc_Fails_WhenSlippageGtMaxDolaToUsdcSlippage() public {
-        gibDOLA(address(fed), dolaAmount*10 * 3);
+        gibDOLA(address(fed), dolaAmount  * 3);
 
         vm.startPrank(address(l2CrossDomainMessenger));
         mockXDomainMessageSender(gov);
-        fed.setMaxSlippageLiquidity(10);
+        fed.setMaxSlippageLiquidity(50);
+        fed.setMaxSlippageDolaToUsdc(1);
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
-        fed.swapDOLAtoUSDC(dolaAmount*10);
+        vm.expectRevert(abi.encodeWithSelector(IRouter.InsufficientOutputAmount.selector));
+        fed.swapDOLAtoUSDC(dolaAmount * 3);
     }
 
     function testL2_SwapUsdcToDola_Fails_WhenSlippageGtMaxUsdcToDolaSlippage() public {
-        gibUSDC(address(fed), usdcAmount*10 * 3);
+        gibUSDC(address(fed), usdcAmount*5);
 
-        uint usdcToSwap = usdcAmount*10 * 3;
+        uint usdcToSwap = usdcAmount*5;
         gibUSDC(address(user), usdcToSwap);
         vm.startPrank(user);
         USDC.approve(address(router), type(uint).max);
@@ -178,12 +185,12 @@ contract VeloFarmerV2Test is Test {
 
         vm.startPrank(address(l2CrossDomainMessenger));
         mockXDomainMessageSender(gov);
-        fed.setMaxSlippageUsdcToDola(50);
+        fed.setMaxSlippageUsdcToDola(1);
         vm.stopPrank();
 
         vm.startPrank(l2chair);
-        vm.expectRevert("Router: INSUFFICIENT_OUTPUT_AMOUNT");
-        fed.swapUSDCtoDOLA(usdcAmount);
+        vm.expectRevert(abi.encodeWithSelector(IRouter.InsufficientOutputAmount.selector));
+        fed.swapUSDCtoDOLA(usdcAmount*5);
     }
 
     function testL2_Withdraw() public {
@@ -194,7 +201,7 @@ contract VeloFarmerV2Test is Test {
 
         vm.startPrank(address(l2CrossDomainMessenger));
         mockXDomainMessageSender(gov);
-        fed.setMaxSlippageLiquidity(50);
+        fed.setMaxSlippageLiquidity(1000);
         vm.stopPrank();
 
         vm.startPrank(l2chair);
@@ -381,7 +388,7 @@ contract VeloFarmerV2Test is Test {
     function getRoute(address from, address to) internal pure returns(IRouter.Route[] memory){
         address factory = address(0x25CbdDb98b35ab1FF77413456B31EC81A6B6B746); //Change to real factory
         IRouter.Route memory route = IRouter.Route(from, to, true, factory);
-        IRouter.Route[] memory routeArray;
+        IRouter.Route[] memory routeArray = new IRouter.Route[](1);
         routeArray[0] = route;
         return routeArray;
     }

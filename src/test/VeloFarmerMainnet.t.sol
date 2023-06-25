@@ -20,6 +20,7 @@ contract VeloFarmerMainnetTest is Test {
     address public optiFedAddress = address(0xA);
     IL2CrossDomainMessenger public l2CrossDomainMessenger = IL2CrossDomainMessenger(0x4200000000000000000000000000000000000007);
     address public l1CrossDomainMessenger = 0x36BDE71C97B33Cc4729cf772aE268934f7AB70B2;
+    //address public l1CrossDomainMessenger = 0x25ace71c97B33Cc4729CF772ae268934F7ab5fA1;
     address public treasury = 0xa283139017a2f5BAdE8d8e25412C600055D318F8;
 
     uint nonce;
@@ -64,13 +65,8 @@ contract VeloFarmerMainnetTest is Test {
         vm.label(veloTokenAddr, "VELO");
 
         vm.startPrank(chair);
-        fed = new VeloFarmer(gov, chair, chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
+        fed = new VeloFarmer(gov, chair, l2chair, treasury, guardian, l2optiBridgeAddress, optiFedAddress, maxSlippageBpsDolaToUsdc, maxSlippageBpsUsdcToDola, maxSlippageLiquidity);
         vm.makePersistent(address(fed));
-
-        vm.stopPrank();
-        vm.startPrank(l1CrossDomainMessenger);
-
-        relayGovMessage(abi.encodeWithSignature("changeL2Chair(address)", l2chair));
 
         vm.stopPrank();
     }

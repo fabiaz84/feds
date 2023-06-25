@@ -12,15 +12,15 @@ pragma solidity ^0.8.13;
 interface IERC20 {
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
-     * another (`to`).
+     *another (`to`).
      *
-     * Note that `value` may be zero.
+     *Note that `value` may be zero.
      */
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     /**
      * @dev Emitted when the allowance of a `spender` for an `owner` is set by
-     * a call to {approve}. `value` is the new allowance.
+     *a call to {approve}. `value` is the new allowance.
      */
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
@@ -42,45 +42,45 @@ interface IERC20 {
     /**
      * @dev Moves `amount` tokens from the caller's account to `to`.
      *
-     * Returns a boolean value indicating whether the operation succeeded.
+     *Returns a boolean value indicating whether the operation succeeded.
      *
-     * Emits a {Transfer} event.
+     *Emits a {Transfer} event.
      */
     function transfer(address to, uint256 amount) external returns (bool);
 
     /**
      * @dev Returns the remaining number of tokens that `spender` will be
-     * allowed to spend on behalf of `owner` through {transferFrom}. This is
-     * zero by default.
+     *allowed to spend on behalf of `owner` through {transferFrom}. This is
+     *zero by default.
      *
-     * This value changes when {approve} or {transferFrom} are called.
+     *This value changes when {approve} or {transferFrom} are called.
      */
     function allowance(address owner, address spender) external view returns (uint256);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
      *
-     * Returns a boolean value indicating whether the operation succeeded.
+     *Returns a boolean value indicating whether the operation succeeded.
      *
-     * IMPORTANT: Beware that changing an allowance with this method brings the risk
-     * that someone may use both the old and the new allowance by unfortunate
-     * transaction ordering. One possible solution to mitigate this race
-     * condition is to first reduce the spender's allowance to 0 and set the
-     * desired value afterwards:
-     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+     *IMPORTANT: Beware that changing an allowance with this method brings the risk
+     *that someone may use both the old and the new allowance by unfortunate
+     *transaction ordering. One possible solution to mitigate this race
+     *condition is to first reduce the spender's allowance to 0 and set the
+     *desired value afterwards:
+     *https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
      *
-     * Emits an {Approval} event.
+     *Emits an {Approval} event.
      */
     function approve(address spender, uint256 amount) external returns (bool);
 
     /**
      * @dev Moves `amount` tokens from `from` to `to` using the
-     * allowance mechanism. `amount` is then deducted from the caller's
-     * allowance.
+     *allowance mechanism. `amount` is then deducted from the caller's
+     *allowance.
      *
-     * Returns a boolean value indicating whether the operation succeeded.
+     *Returns a boolean value indicating whether the operation succeeded.
      *
-     * Emits a {Transfer} event.
+     *Emits a {Transfer} event.
      */
     function transferFrom(
         address from,
@@ -103,12 +103,12 @@ interface IERC20 {
 }
 
 interface IGauge {
-    //function deposit(uint amount, uint tokenId) external;
     function deposit(uint amount) external;
-    //function getReward(address account, address[] memory tokens) external;
     function getReward(address account) external;
+    function notifyRewardAmount(uint amount) external;
     function withdraw(uint shares) external;
     function balanceOf(address account) external returns (uint);
+    function voter() external view returns(address);
 }
 
 /**
@@ -116,7 +116,7 @@ interface IGauge {
  */
 interface IL2ERC20Bridge {
     /**********
-     * Events *
+     *Events *
      **********/
 
     event WithdrawalInitiated(
@@ -147,24 +147,24 @@ interface IL2ERC20Bridge {
     );
 
     /********************
-     * Public Functions *
+     *Public Functions *
      ********************/
 
     /**
      * @dev get the address of the corresponding L1 bridge contract.
      * @return Address of the corresponding L1 bridge contract.
-     */
+      */
     function l1TokenBridge() external returns (address);
 
     /**
      * @dev initiate a withdraw of some tokens to the caller's account on L1
      * @param _l2Token Address of L2 token where withdrawal was initiated.
      * @param _amount Amount of the token to withdraw.
-     * param _l1Gas Unused, but included for potential forward compatibility considerations.
+     *param _l1Gas Unused, but included for potential forward compatibility considerations.
      * @param _data Optional data to forward to L1. This data is provided
-     *        solely as a convenience for external contracts. Aside from enforcing a maximum
-     *        length, these contracts provide no guarantees about its content.
-     */
+     *solely as a convenience for external contracts. Aside from enforcing a maximum
+     *length, these contracts provide no guarantees about its content.
+      */
     function withdraw(
         address _l2Token,
         uint256 _amount,
@@ -177,11 +177,11 @@ interface IL2ERC20Bridge {
      * @param _l2Token Address of L2 token where withdrawal is initiated.
      * @param _to L1 adress to credit the withdrawal to.
      * @param _amount Amount of the token to withdraw.
-     * param _l1Gas Unused, but included for potential forward compatibility considerations.
+     *param _l1Gas Unused, but included for potential forward compatibility considerations.
      * @param _data Optional data to forward to L1. This data is provided
-     *        solely as a convenience for external contracts. Aside from enforcing a maximum
-     *        length, these contracts provide no guarantees about its content.
-     */
+     *solely as a convenience for external contracts. Aside from enforcing a maximum
+     *length, these contracts provide no guarantees about its content.
+      */
     function withdrawTo(
         address _l2Token,
         address _to,
@@ -191,22 +191,22 @@ interface IL2ERC20Bridge {
     ) external;
 
     /*************************
-     * Cross-chain Functions *
+     *Cross-chain Functions *
      *************************/
 
     /**
      * @dev Complete a deposit from L1 to L2, and credits funds to the recipient's balance of this
-     * L2 token. This call will fail if it did not originate from a corresponding deposit in
-     * L1StandardTokenBridge.
+     *L2 token. This call will fail if it did not originate from a corresponding deposit in
+     *L1StandardTokenBridge.
      * @param _l1Token Address for the l1 token this is called with
      * @param _l2Token Address for the l2 token this is called with
      * @param _from Account to pull the deposit from on L2.
      * @param _to Address to receive the withdrawal at
      * @param _amount Amount of the token to withdraw
      * @param _data Data provider by the sender on L1. This data is provided
-     *        solely as a convenience for external contracts. Aside from enforcing a maximum
-     *        length, these contracts provide no guarantees about its content.
-     */
+     *solely as a convenience for external contracts. Aside from enforcing a maximum
+     *length, these contracts provide no guarantees about its content.
+      */
     function finalizeDeposit(
         address _l1Token,
         address _l2Token,
@@ -222,7 +222,7 @@ interface IL2ERC20Bridge {
  */
 interface ICrossDomainMessenger {
     /**********
-     * Events *
+     *Events *
      **********/
 
     event SentMessage(
@@ -236,21 +236,21 @@ interface ICrossDomainMessenger {
     event FailedRelayedMessage(bytes32 indexed msgHash);
 
     /*************
-     * Variables *
+     *Variables *
      *************/
 
     function xDomainMessageSender() external view returns (address);
 
     /********************
-     * Public Functions *
+     *Public Functions *
      ********************/
 
     /**
-     * Sends a cross domain message to the target messenger.
-     * @param _target Target contract address.
-     * @param _message Message to send to the target.
-     * @param _gasLimit Gas limit for the provided message.
-     */
+      *Sends a cross domain message to the target messenger.
+      * @param _target Target contract address.
+      * @param _message Message to send to the target.
+      * @param _gasLimit Gas limit for the provided message.
+      */
     function sendMessage(
         address _target,
         bytes calldata _message,
@@ -272,15 +272,11 @@ contract VeloFarmerV2 {
     uint public constant DOLA_USDC_CONVERSION_MULTI= 1e12;
     uint public constant PRECISION = 10_000;
 
-    //IGauge public constant dolaGauge = IGauge(0xAFD2c84b9d1cd50E7E18a55e419749A6c9055E1F);
     IGauge public constant dolaGauge = IGauge(0xa1034Ed2C9eb616d6F7f318614316e64682e7923);
-    //IERC20 public constant LP_TOKEN = IERC20(0x6C5019D345Ec05004A7E7B0623A91a0D9B8D590d);
     IERC20 public constant LP_TOKEN = IERC20(0xB720FBC32d60BB6dcc955Be86b98D8fD3c4bA645);
     address public constant veloTokenAddr = 0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db;
-    //address public constant factory = 0x25CbdDb98b35ab1FF77413456B31EC81A6B6B746; //Change to real factory
-    address public constant factory = 0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a; //Change to real factory
+    address public constant factory = 0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a;
     ICrossDomainMessenger public constant ovmL2CrossDomainMessenger = ICrossDomainMessenger(0x4200000000000000000000000000000000000007);
-    //IRouter public constant router = IRouter(0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9);
     IRouter public constant router = IRouter(0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858);
     IERC20 public constant DOLA = IERC20(0x8aE125E8653821E851F12A49F7765db9a9ce7384);
     IERC20 public constant USDC = IERC20(0x7F5c764cBc14f9669B88837ca1490cCa17c31607);
@@ -296,16 +292,16 @@ contract VeloFarmerV2 {
     error LiquiditySlippageTooHigh();
     
     constructor(
-            address gov_,
-            address chair_,
-            address l2chair_,
-            address treasury_,
-            address guardian_,
-            address bridge_,
-            address optiFed_,
-            uint maxSlippageBpsDolaToUsdc_,
-            uint maxSlippageBpsUsdcToDola_,
-            uint maxSlippageBpsLiquidity_
+        address gov_,
+        address chair_,
+        address l2chair_,
+        address treasury_,
+        address guardian_,
+        address bridge_,
+        address optiFed_,
+        uint maxSlippageBpsDolaToUsdc_,
+        uint maxSlippageBpsUsdcToDola_,
+        uint maxSlippageBpsLiquidity_
         )
     {
         gov = gov_;
@@ -351,15 +347,8 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Claims all VELO token rewards accrued by this contract & transfer all VELO owned by this contract to `treasury`
-    function claimVeloRewards() external {
-        address[] memory addr = new address[](1);
-        addr[0] = veloTokenAddr;
-        dolaGauge.getReward(address(this), addr);
-
-        IERC20(addr[0]).transfer(treasury, IERC20(addr[0]).balanceOf(address(this)));
-    }
-    */
+     * @notice Claims all VELO token rewards accrued by this contract & transfer all VELO owned by this contract to `treasury`
+     */
     function claimVeloRewards() external {
         dolaGauge.getReward(address(this));
 
@@ -367,23 +356,21 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Attempts to deposit `dolaAmount` of DOLA & `usdcAmount` of USDC into Velodrome DOLA/USDC stable pool. Then, deposits LP tokens into gauge.
-    @param dolaAmount Amount of DOLA to be added as liquidity in Velodrome DOLA/USDC pool
-    @param usdcAmount Amount of USDC to be added as liquidity in Velodrome DOLA/USDC pool
-    */
+     * @notice Attempts to deposit `dolaAmount` of DOLA & `usdcAmount` of USDC into Velodrome DOLA/USDC stable pool. Then, deposits LP tokens into gauge.
+     * @param dolaAmount Amount of DOLA to be added as liquidity in Velodrome DOLA/USDC pool
+     * @param usdcAmount Amount of USDC to be added as liquidity in Velodrome DOLA/USDC pool
+     */
     function deposit(uint dolaAmount, uint usdcAmount) public onlyChair {
-        uint lpTokenPrice = getLpTokenPrice(false);
-        emit log_uint(1);
+        uint lpTokenPrice = getLpTokenPrice();
 
         DOLA.approve(address(router), dolaAmount);
         USDC.approve(address(router), usdcAmount);
         (uint dolaSpent, uint usdcSpent, uint lpTokensReceived) = router.addLiquidity(address(DOLA), address(USDC), true, dolaAmount, usdcAmount, 0, 0, address(this), block.timestamp);
         require(lpTokensReceived > 0, "No LP tokens received");
-        require(LP_TOKEN.balanceOf(address(this)) > 0, "No LP tokens received");
 
-        uint totalDolaValue = dolaSpent + (usdcSpent * DOLA_USDC_CONVERSION_MULTI);
+        uint totalDolaValue = dolaSpent + (usdcSpent *DOLA_USDC_CONVERSION_MULTI);
 
-        uint expectedLpTokens = totalDolaValue * 1e18 / lpTokenPrice * (PRECISION - maxSlippageBpsLiquidity) / PRECISION;
+        uint expectedLpTokens = totalDolaValue *1e18 / lpTokenPrice *(PRECISION - maxSlippageBpsLiquidity) / PRECISION;
         if (lpTokensReceived < expectedLpTokens) revert LiquiditySlippageTooHigh();
         
         LP_TOKEN.approve(address(dolaGauge), LP_TOKEN.balanceOf(address(this)));
@@ -391,33 +378,32 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Calls `deposit()` with entire DOLA & USDC token balance of this contract.
-    */
+     * @notice Calls `deposit()` with entire DOLA & USDC token balance of this contract.
+     */
     function depositAll() external {
         deposit(DOLA.balanceOf(address(this)), USDC.balanceOf(address(this)));
     }
 
     /**
-    @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
-    @dev If attempting to remove more DOLA than total LP tokens are worth, will remove all LP tokens.
-    @param dolaAmount Desired dola value to remove from DOLA/USDC pool. Will attempt to remove 50/50 while allowing for `maxSlippageBpsLiquidity` bps of variance.
-    @return Amount of USDC received from liquidity removal. Used by withdrawLiquidityAndSwap wrapper.
-    */
+     * @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC.
+     * @dev If attempting to remove more DOLA than total LP tokens are worth, will remove all LP tokens.
+     * @param dolaAmount Desired dola value to remove from DOLA/USDC pool. Will attempt to remove 50/50 while allowing for `maxSlippageBpsLiquidity` bps of variance.
+     * @return Amount of USDC received from liquidity removal. Used by withdrawLiquidityAndSwap wrapper.
+     */
     function withdrawLiquidity(uint dolaAmount) public onlyChair returns (uint) {
-        uint lpTokenPrice = getLpTokenPrice(true);
-        uint liquidityToWithdraw = dolaAmount * 1e18 / lpTokenPrice;
+        uint lpTokenPrice = getLpTokenPrice();
+        uint liquidityToWithdraw = dolaAmount *1e18 / lpTokenPrice;
         uint ownedLiquidity = dolaGauge.balanceOf(address(this));
 
         if (liquidityToWithdraw > ownedLiquidity) liquidityToWithdraw = ownedLiquidity;
-
         dolaGauge.withdraw(liquidityToWithdraw);
 
         LP_TOKEN.approve(address(router), liquidityToWithdraw);
-        (uint amountDola, uint amountUSDC) = router.removeLiquidity(address(DOLA), address(USDC), true, liquidityToWithdraw, 0, 0, address(this), block.timestamp);
+        (uint amountUSDC, uint amountDola) = router.removeLiquidity(address(USDC), address(DOLA), true, liquidityToWithdraw, 0, 0, address(this), block.timestamp);
 
-        uint totalDolaReceived = amountDola + (amountUSDC * DOLA_USDC_CONVERSION_MULTI);
+        uint totalDolaReceived = amountDola + (amountUSDC *DOLA_USDC_CONVERSION_MULTI);
 
-        if ((dolaAmount * (PRECISION - maxSlippageBpsLiquidity) / PRECISION) > totalDolaReceived) {
+        if ((dolaAmount *(PRECISION - maxSlippageBpsLiquidity) / PRECISION) > totalDolaReceived) {
             revert LiquiditySlippageTooHigh();
         }
 
@@ -425,9 +411,9 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC and swaps redeemed USDC to DOLA.
-    @param dolaAmount Desired dola value to remove from DOLA/USDC pool. Will attempt to remove 50/50 while allowing for `maxSlippageBpsLiquidity` bps of variance.
-    */
+     * @notice Withdraws `dolaAmount` worth of LP tokens from gauge. Then, redeems LP tokens for DOLA/USDC and swaps redeemed USDC to DOLA.
+     * @param dolaAmount Desired dola value to remove from DOLA/USDC pool. Will attempt to remove 50/50 while allowing for `maxSlippageBpsLiquidity` bps of variance.
+     */
     function withdrawLiquidityAndSwapToDOLA(uint dolaAmount) external {
         uint usdcAmount = withdrawLiquidity(dolaAmount);
 
@@ -435,9 +421,9 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Withdraws `dolaAmount` of DOLA to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
-    @param dolaAmount Amount of DOLA to withdraw and send to L1 OptiFed
-    */
+     * @notice Withdraws `dolaAmount` of DOLA to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
+     * @param dolaAmount Amount of DOLA to withdraw and send to L1 OptiFed
+     */
     function withdrawToL1OptiFed(uint dolaAmount) external onlyChair {
         if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
 
@@ -445,10 +431,10 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Withdraws `dolaAmount` of DOLA & `usdcAmount` of USDC to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
-    @param dolaAmount Amount of DOLA to withdraw and send to L1 OptiFed
-    @param usdcAmount Amount of USDC to withdraw and send to L1 OptiFed
-    */
+     * @notice Withdraws `dolaAmount` of DOLA & `usdcAmount` of USDC to optiFed on L1. Will take 7 days before withdraw is claimable on L1.
+     * @param dolaAmount Amount of DOLA to withdraw and send to L1 OptiFed
+     * @param usdcAmount Amount of USDC to withdraw and send to L1 OptiFed
+     */
     function withdrawToL1OptiFed(uint dolaAmount, uint usdcAmount) external onlyChair {
         if (dolaAmount > DOLA.balanceOf(address(this))) revert NotEnoughTokens();
         if (usdcAmount > USDC.balanceOf(address(this))) revert NotEnoughTokens();
@@ -458,11 +444,11 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Withdraws `amount` of `l2Token` to address `to` on L1. Will take 7 days before withdraw is claimable.
-    @param l2Token Address of the L2 token to be withdrawn
-    @param to L1 Address that tokens will be sent to
-    @param amount Amount of the L2 token to be withdrawn
-    */
+     * @notice Withdraws `amount` of `l2Token` to address `to` on L1. Will take 7 days before withdraw is claimable.
+     * @param l2Token Address of the L2 token to be withdrawn
+     * @param to L1 Address that tokens will be sent to
+     * @param amount Amount of the L2 token to be withdrawn
+     */
     function withdrawTokensToL1(address l2Token, address to, uint amount) external onlyChair {
         if (amount > IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
 
@@ -471,44 +457,34 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Swap `usdcAmount` of USDC to DOLA through velodrome.
-    @param usdcAmount Amount of USDC to swap to DOLA
-    */
+     * @notice Swap `usdcAmount` of USDC to DOLA through velodrome.
+     * @param usdcAmount Amount of USDC to swap to DOLA
+     */
     function swapUSDCtoDOLA(uint usdcAmount) public onlyChair {
-        uint minOut = usdcAmount * (PRECISION - maxSlippageBpsUsdcToDola) / PRECISION * DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = usdcAmount *(PRECISION - maxSlippageBpsUsdcToDola) / PRECISION *DOLA_USDC_CONVERSION_MULTI;
 
         USDC.approve(address(router), usdcAmount);
-        emit log_uint(getRoute(address(DOLA), address(USDC)).length);
         router.swapExactTokensForTokens(usdcAmount, minOut, getRoute(address(USDC), address(DOLA)), address(this), block.timestamp);
     }
-    event log_uint(uint);
+
     /**
-    @notice Swap `dolaAmount` of DOLA to USDC through velodrome.
-    @param dolaAmount Amount of DOLA to swap to USDC
-    */
+     * @notice Swap `dolaAmount` of DOLA to USDC through velodrome.
+     * @param dolaAmount Amount of DOLA to swap to USDC
+     */
     function swapDOLAtoUSDC(uint dolaAmount) public onlyChair { 
-        uint minOut = dolaAmount * (PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
+        uint minOut = dolaAmount *(PRECISION - maxSlippageBpsDolaToUsdc) / PRECISION / DOLA_USDC_CONVERSION_MULTI;
         
         DOLA.approve(address(router), dolaAmount);
-        emit log_uint(getRoute(address(DOLA), address(USDC)).length);
         router.swapExactTokensForTokens(dolaAmount, minOut, getRoute(address(DOLA), address(USDC)), address(this), block.timestamp);
     }
 
     /**
-    @notice Calculates approximate price of 1 Velodrome DOLA/USDC stable pool LP token
-    */
-    function getLpTokenPrice(bool withdraw_) internal view returns (uint) {
+     * @notice Calculates approximate price of 1 Velodrome DOLA/USDC stable pool LP token
+     */
+    function getLpTokenPrice() internal view returns (uint) {
         (uint dolaAmountOneLP, uint usdcAmountOneLP) = router.quoteRemoveLiquidity(address(DOLA), address(USDC), true, factory, 0.001 ether);
-        uint dolaForRemovedUsdc = router.getAmountsOut(usdcAmountOneLP, getRoute(address(USDC), address(DOLA)))[0];
-        uint usdcForRemovedDola = router.getAmountsOut(dolaAmountOneLP, getRoute(address(DOLA), address(USDC)))[0];
-        usdcForRemovedDola *= DOLA_USDC_CONVERSION_MULTI;
         usdcAmountOneLP *= DOLA_USDC_CONVERSION_MULTI;
-
-        if (dolaAmountOneLP + dolaForRemovedUsdc > usdcAmountOneLP + usdcForRemovedDola && withdraw_) {
-            return (dolaAmountOneLP + dolaForRemovedUsdc) * 1000;
-        } else {
-            return (usdcAmountOneLP + usdcForRemovedDola) * 1000;
-        }
+        return (dolaAmountOneLP + usdcAmountOneLP)*1000;
     }
 
     /**
@@ -525,8 +501,8 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Method for current chair of the fed to resign
-    */
+     * @notice Method for current chair of the fed to resign
+     */
     function resign() external onlyChair {
         if (msg.sender == l2chair) {
             l2chair = address(0);
@@ -536,88 +512,88 @@ contract VeloFarmerV2 {
     }
 
     /**
-    @notice Governance only function for setting acceptable slippage when swapping DOLA -> USDC
-    @param newMaxSlippageBps The new maximum allowed loss for DOLA -> USDC swaps. 1 = 0.01%
-    */
+     * @notice Governance only function for setting acceptable slippage when swapping DOLA -> USDC
+     * @param newMaxSlippageBps The new maximum allowed loss for DOLA -> USDC swaps. 1 = 0.01%
+     */
     function setMaxSlippageDolaToUsdc(uint newMaxSlippageBps) onlyGovOrGuardian external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsDolaToUsdc = newMaxSlippageBps;
     }
 
     /**
-    @notice Governance only function for setting acceptable slippage when swapping USDC -> DOLA
-    @param newMaxSlippageBps The new maximum allowed loss for USDC -> DOLA swaps. 1 = 0.01%
-    */
+     * @notice Governance only function for setting acceptable slippage when swapping USDC -> DOLA
+     * @param newMaxSlippageBps The new maximum allowed loss for USDC -> DOLA swaps. 1 = 0.01%
+     */
     function setMaxSlippageUsdcToDola(uint newMaxSlippageBps) onlyGovOrGuardian external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsUsdcToDola = newMaxSlippageBps;
     }
 
     /**
-    @notice Governance only function for setting acceptable slippage when adding or removing liquidty from DOLA/USDC pool
-    @param newMaxSlippageBps The new maximum allowed loss for adding/removing liquidity from DOLA/USDC pool. 1 = 0.01%
-    */
+     * @notice Governance only function for setting acceptable slippage when adding or removing liquidty from DOLA/USDC pool
+     * @param newMaxSlippageBps The new maximum allowed loss for adding/removing liquidity from DOLA/USDC pool. 1 = 0.01%
+     */
     function setMaxSlippageLiquidity(uint newMaxSlippageBps) onlyGovOrGuardian external {
         if (newMaxSlippageBps > 10000) revert MaxSlippageTooHigh();
         maxSlippageBpsLiquidity = newMaxSlippageBps;
     }
 
     /**
-    @notice Method for `gov` to change `pendingGov` address
-    @dev `pendingGov` will have to call `claimGov` to complete `gov` transfer
-    @dev `pendingGov` should be an L1 address
-    @param newPendingGov_ L1 address to be set as `pendingGov`
-    */
+     * @notice Method for `gov` to change `pendingGov` address
+     * @dev `pendingGov` will have to call `claimGov` to complete `gov` transfer
+     * @dev `pendingGov` should be an L1 address
+     * @param newPendingGov_ L1 address to be set as `pendingGov`
+     */
     function setPendingGov(address newPendingGov_) onlyGov external {
         pendingGov = newPendingGov_;
     }
 
     /**
-    @notice Method for `pendingGov` to claim `gov` role.
-    */
+     * @notice Method for `pendingGov` to claim `gov` role.
+     */
     function claimGov() external onlyPendingGov {
         gov = pendingGov;
         pendingGov = address(0);
     }
 
     /**
-    @notice Method for gov to change treasury address, the address that receives all rewards
-    @param newTreasury_ L2 address to be set as treasury
-    */
+     * @notice Method for gov to change treasury address, the address that receives all rewards
+     * @param newTreasury_ L2 address to be set as treasury
+     */
     function changeTreasury(address newTreasury_) external onlyGov {
         treasury = newTreasury_;
     }
 
     /**
-    @notice Method for gov to change the chair
-    @dev chair address should be set to the address of L1 VeloFarmerMessenger if it is being used
-    @param newChair_ L1 address to be set as chair
-    */
+     * @notice Method for gov to change the chair
+     * @dev chair address should be set to the address of L1 VeloFarmerMessenger if it is being used
+     * @param newChair_ L1 address to be set as chair
+     */
     function changeChair(address newChair_) external onlyGov {
         chair = newChair_;
     }
 
     /**
-    @notice Method for gov to change the L2 chair
-    @param newL2Chair_ L2 address to be set as l2chair
-    */
+     * @notice Method for gov to change the L2 chair
+     * @param newL2Chair_ L2 address to be set as l2chair
+     */
     function changeL2Chair(address newL2Chair_) external onlyGov {
         l2chair = newL2Chair_;
     }
 
     /**
-    @notice Method for gov to change the guardian
-    @param guardian_ L1 address to be set as guardian
-    */
+     * @notice Method for gov to change the guardian
+     * @param guardian_ L1 address to be set as guardian
+     */
     function changeGuardian(address guardian_) external onlyGov {
         guardian = guardian_;
     }
 
     /**
-    @notice Method for gov to change the L1 optiFed address
-    @dev optiFed is the L1 address that receives all bridged DOLA/USDC from both withdrawToL1OptiFed functions
-    @param newOptiFed_ L1 address to be set as optiFed
-    */
+     * @notice Method for gov to change the L1 optiFed address
+     * @dev optiFed is the L1 address that receives all bridged DOLA/USDC from both withdrawToL1OptiFed functions
+     * @param newOptiFed_ L1 address to be set as optiFed
+     */
     function changeOptiFed(address newOptiFed_) external onlyGov {
         optiFed = newOptiFed_;
     }
