@@ -11,7 +11,6 @@ import {AuraFarmer} from "src/arbi-fed/AuraFarmer.sol";
 import "src/interfaces/aura/IAuraBalRewardPool.sol";
 import "src/interfaces/balancer/IComposablePoolFactory.sol";
 import "src/interfaces/balancer/IVault.sol";
-import {GovernorL2} from "src/l2-gov/GovernorL2.sol";
 import {AddressAliasHelper} from "src/utils/AddressAliasHelper.sol";
 import {IL2GatewayRouter} from "src/interfaces/arbitrum/IL2GatewayRouter.sol";
 
@@ -44,7 +43,8 @@ contract AuraFarmerTest is Test {
     error WithdrawMaxLossTooHigh();
     error TakeProfitMaxLossTooHigh();
     error OnlyL2Chair();
-    error OnlyL2Gov();
+    error OnlyL2Guardian();
+    error OnlyGov();
     error MaxSlippageTooHigh();
     error NotEnoughTokens();
     error NotEnoughBPT();
@@ -72,7 +72,6 @@ contract AuraFarmerTest is Test {
     IERC20 public USDCArbi = IERC20(0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8);
     address dolaUser = 0x052f7890E50fb5b921BCAb3B10B79a58A3B9d40f; 
     address usdcUser = 0x5bdf85216ec1e38D6458C870992A69e38e03F7Ef;
-    GovernorL2 governor;
     address l2MessengerAlias;
     address l2Chair = address(0x69);
     address arbiFedL1 = address(0x23);
@@ -106,8 +105,6 @@ contract AuraFarmerTest is Test {
         
         l2MessengerAlias = AddressAliasHelper.applyL1ToL2Alias(address(arbiGovMessengerL1));
 
-        governor = new GovernorL2(address(arbiGovMessengerL1));
-
         mockBaseRewardPoolArbi = IAuraBalRewardPool(address(new MockAuraRewardPool(address(USDCArbi)))); // Dummy value 
 
         mockVault = IVault(address(new MockVault(address(USDCArbi))));
@@ -119,7 +116,6 @@ contract AuraFarmerTest is Test {
             address(DOLAArbi), //bpt
             booster,
             l2Chair,
-            address(governor),
             arbiFedL1,
             address(arbiGovMessengerL1)
         );
@@ -133,121 +129,86 @@ contract AuraFarmerTest is Test {
             maxLossTakeProfit,
             poolId
         );
-
-        vm.stopPrank();
     }
 
     function test_initialized_properly() public {
         
         assertEq(auraFarmer.l2Chair(), l2Chair);
-        assertEq(auraFarmer.l2Gov(), address(governor));
-        assertEq(governor.govMessenger(), address(arbiGovMessengerL1));
-    }
-
-    function test_changeGov() public {
-        
-        vm.expectRevert(OnlyL2Gov.selector);
-        auraFarmer.changeGov(address(0));
-
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.changeGov.selector, address(0));
-
-        vm.prank(l2MessengerAlias); // simulating a message from the aliased L1 Arbi Messenger to call the governor
-        governor.execute(address(auraFarmer), data);
-
-        assertEq(auraFarmer.l2Gov(), address(0));
+        assertEq(auraFarmer.arbiGovMessengerL1(), address(arbiGovMessengerL1));
     }
 
     function test_changeL2Chair() public {
-        vm.expectRevert(OnlyL2Gov.selector);
-        auraFarmer.changeGov(address(0x70));
-
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.changeL2Chair.selector, address(0x70));
+        vm.expectRevert(OnlyGov.selector);
+        auraFarmer.changeL2Chair(address(0x70));
 
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
-
+        auraFarmer.changeL2Chair(address(0x70));
         assertEq(auraFarmer.l2Chair(), address(0x70));
     }
 
 
     function test_setMaxLossExpansionBPS() public {
-        vm.expectRevert(OnlyL2Gov.selector);
+        vm.expectRevert(OnlyL2Guardian.selector);
         auraFarmer.setMaxLossExpansionBps(0);
 
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.setMaxLossExpansionBps.selector, 0);
-
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.setMaxLossExpansionBps(0);
 
         assertEq(auraFarmer.maxLossExpansionBps(), 0);
 
-        data = abi.encodeWithSelector(AuraFarmer.setMaxLossExpansionBps.selector, 10000);
-
         vm.expectRevert(ExpansionMaxLossTooHigh.selector);
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.setMaxLossExpansionBps(10000);
     }
 
     function test_setMaxWithdrawExpansionBPS() public {
-        vm.expectRevert(OnlyL2Gov.selector);
+        vm.expectRevert(OnlyL2Guardian.selector);
         auraFarmer.setMaxLossWithdrawBps(0);
 
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.setMaxLossWithdrawBps.selector, 0);
-
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.setMaxLossWithdrawBps(0);
 
         assertEq(auraFarmer.maxLossWithdrawBps(), 0);
 
-        data = abi.encodeWithSelector(AuraFarmer.setMaxLossWithdrawBps.selector, 10000);
-
         vm.expectRevert(WithdrawMaxLossTooHigh.selector);
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.setMaxLossWithdrawBps(10000);
     }
 
     function test_setMaxLossTakeProfit() public {
-        vm.expectRevert(OnlyL2Gov.selector);
+        vm.expectRevert(OnlyL2Guardian.selector);
         auraFarmer.setMaxLossTakeProfitBps(0);
 
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.setMaxLossTakeProfitBps.selector, 0);
-
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.setMaxLossTakeProfitBps(0);
 
         assertEq(auraFarmer.maxLossTakeProfitBps(), 0);
 
-        data = abi.encodeWithSelector(AuraFarmer.setMaxLossTakeProfitBps.selector, 10000);
-
         vm.expectRevert(TakeProfitMaxLossTooHigh.selector);
         vm.prank(l2MessengerAlias);
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.setMaxLossTakeProfitBps(10000);
     }
 
     function test_changeArbiFedL1() public {
-        vm.expectRevert(OnlyL2Gov.selector);
+        vm.expectRevert(OnlyGov.selector);
         auraFarmer.changeArbiFedL1(address(0x70));
         
         assertEq(address(auraFarmer.arbiFedL1()), arbiFedL1);
        
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.changeArbiFedL1.selector, address(0x70));
-        
         vm.startPrank(l2MessengerAlias); 
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.changeArbiFedL1(address(0x70));
 
         assertEq(address(auraFarmer.arbiFedL1()), address(0x70));
     }
 
     function test_changeArbiGovMessengerL1() public {
-        vm.expectRevert(OnlyL2Gov.selector);
+        vm.expectRevert(OnlyGov.selector);
         auraFarmer.changeArbiGovMessengerL1(address(0x70));
 
         assertEq(address(auraFarmer.arbiGovMessengerL1()), address(arbiGovMessengerL1));
         
-        bytes memory data = abi.encodeWithSelector(AuraFarmer.changeArbiGovMessengerL1.selector, address(0x70));
-        
         vm.startPrank(l2MessengerAlias); 
-        governor.execute(address(auraFarmer), data);
+        auraFarmer.changeArbiGovMessengerL1(address(0x70));
 
         assertEq(address(auraFarmer.arbiGovMessengerL1()), address(0x70));
     }

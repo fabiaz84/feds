@@ -18,8 +18,10 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     error ExpansionMaxLossTooHigh();
     error WithdrawMaxLossTooHigh();
     error TakeProfitMaxLossTooHigh();
+    error MaxLossHigherThanSetableByGuardian();
     error OnlyL2Chair();
-    error OnlyL2Gov();
+    error OnlyGov();
+    error OnlyL2Guardian();
     error NotEnoughTokens();
     error NotEnoughBPT();
     error AuraWithdrawFailed();
@@ -32,7 +34,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     IAuraBooster public booster;
    
     address public l2Chair;
-    address public l2Gov;
+    address public l2Guardian;
 
     uint public dolaDeposited; // TODO: use this to calculate the amount of DOLA to deposit and if we have profit
     uint public dolaProfit; // TODO: review this variable accounting
@@ -40,6 +42,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
+    uint public maxLossSetableByGuardianBps;
 
     // Actual addresses
     IL2GatewayRouter public immutable l2GatewayRouter = IL2GatewayRouter(0x5288c571Fd7aD117beA99bF60FE0846C4E84F933); 
@@ -64,20 +67,19 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         address bpt;
         address booster;
         address l2Chair;
-        address l2Gov;
         address arbiFedL1;
         address arbiGovMessengerL1;
     }
 
 
     constructor(
-            InitialAddresses memory addresses_,
-            uint maxLossExpansionBps_,
-            uint maxLossWithdrawBps_,
-            uint maxLossTakeProfitBps_,
-            bytes32 poolId_
-            ) 
-            BalancerComposableStablepoolAdapter(poolId_, addresses_.dola, addresses_.vault, addresses_.bpt)
+        InitialAddresses memory addresses_,
+        uint maxLossExpansionBps_,
+        uint maxLossWithdrawBps_,
+        uint maxLossTakeProfitBps_,
+        bytes32 poolId_
+        ) 
+        BalancerComposableStablepoolAdapter(poolId_, addresses_.dola, addresses_.vault, addresses_.bpt)
     {   
         if(maxLossExpansionBps_ >= 10000) revert ExpansionMaxLossTooHigh();
         if(maxLossWithdrawBps_ >= 10000) revert WithdrawMaxLossTooHigh();
@@ -91,13 +93,21 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         maxLossWithdrawBps = maxLossWithdrawBps_;
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
         l2Chair = addresses_.l2Chair;
-        l2Gov = addresses_.l2Gov;
         arbiFedL1 = addresses_.arbiFedL1;
         arbiGovMessengerL1 = addresses_.arbiGovMessengerL1;
     }
 
     modifier onlyGov() {
-        if(l2Gov != msg.sender) revert OnlyL2Gov();
+        address callerL1 = AddressAliasHelper.undoL1ToL2Alias(msg.sender);
+        if (arbiGovMessengerL1 != callerL1) revert OnlyGov();
+        _;
+    }
+
+    modifier onlyGuardian() {
+        if(l2Guardian != msg.sender){
+            address callerL1 = AddressAliasHelper.undoL1ToL2Alias(msg.sender);
+            if (arbiGovMessengerL1 != callerL1) revert OnlyL2Guardian();       
+        }
         _;
     }
 
@@ -107,17 +117,14 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     }
 
     /**
-    @notice Method for gov to change gov address
-    */
-    function changeGov(address newGov) onlyGov external {
-        l2Gov = newGov;
-    }
-
-    /**
     @notice Method for gov to change the chair
     */
     function changeL2Chair(address newL2Chair) onlyGov external {
         l2Chair = newL2Chair;
+    }
+
+    function changeL2Guardian(address newL2Guardian) onlyGov external {
+        l2Guardian = newL2Guardian;
     }
 
     function changeArbiFedL1(address newArbiFedL1) onlyGov external {
@@ -135,19 +142,26 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         l2Chair = address(0);
     }
 
-    function setMaxLossExpansionBps(uint newMaxLossExpansionBps) onlyGov external {
+    function setMaxLossExpansionBps(uint newMaxLossExpansionBps) onlyGuardian external {
+        if(msg.sender == l2Guardian && newMaxLossExpansionBps > maxLossSetableByGuardianBps) revert MaxLossHigherThanSetableByGuardian();
         if(newMaxLossExpansionBps >= 10000) revert ExpansionMaxLossTooHigh();
         maxLossExpansionBps = newMaxLossExpansionBps;
     }
 
-    function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) onlyGov external  {
+    function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) onlyGuardian external  {
+        if(msg.sender == l2Guardian && newMaxLossWithdrawBps > maxLossSetableByGuardianBps) revert MaxLossHigherThanSetableByGuardian();
         if(newMaxLossWithdrawBps >= 10000) revert WithdrawMaxLossTooHigh();
         maxLossWithdrawBps = newMaxLossWithdrawBps;
     }
 
-    function setMaxLossTakeProfitBps(uint newMaxLossTakeProfitBps) onlyGov external {
+    function setMaxLossTakeProfitBps(uint newMaxLossTakeProfitBps) onlyGuardian external {
+        if(msg.sender == l2Guardian && newMaxLossTakeProfitBps > maxLossSetableByGuardianBps) revert MaxLossHigherThanSetableByGuardian();
         if(newMaxLossTakeProfitBps >= 10000) revert TakeProfitMaxLossTooHigh();
         maxLossTakeProfitBps = newMaxLossTakeProfitBps;   
+    }
+
+    function setMaxLossSetableByGuardianBps(uint newMaxLossSetableByGuardianBps) onlyGov external {
+       maxLossSetableByGuardianBps = newMaxLossSetableByGuardianBps; 
     }
 
     /**
@@ -251,7 +265,6 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     */
     function withdrawTokensToL1(address l1Token,address l2Token, address to, uint amount) external onlyChair {
         if (amount > IERC20(l2Token).balanceOf(address(this))) revert NotEnoughTokens();
-
         bytes memory empty;
         l2GatewayRouter.outboundTransfer(address(l1Token), to, amount, empty);
     }

@@ -47,22 +47,23 @@ contract ArbiFedTest is Test {
 
 
     function test_expansion() public {
-    
+        vm.startPrank(chair);
         uint256 gasPrice = 300000000;
-        uint256 maxGas = 275000;
-        uint256 maxSubmissionCost = 0.05 ether;
+        uint gasLimit = 275000;
+        uint maxSubmissionCost = 0.05 ether;
+        fed.setGasLimit(gasLimit);
+        fed.setMaxSubmissionCost(maxSubmissionCost);
+        vm.stopPrank();
 
         assertEq(DOLA.balanceOf(address(fed)),0);
 
-        bytes memory empty;
-        bytes memory data = abi.encode(maxSubmissionCost, empty);
-
-        fed.expansion{value: maxSubmissionCost + maxGas * gasPrice}(dolaAmount,275000,300000000, data);
+        fed.expansion{value: maxSubmissionCost + gasLimit * gasPrice}(dolaAmount, gasPrice);
 
         assertEq(DOLA.balanceOf(address(fed)),0);
+
 
         vm.expectRevert(DeltaAboveMax.selector);
-        fed.expansion{value: maxSubmissionCost + maxGas * gasPrice}(dolaAmount * 10,275000,300000000, data);
+        fed.expansion{value: maxSubmissionCost + gasLimit * gasPrice}(dolaAmount * 10, gasPrice);
     }
 
     function test_contraction() public {

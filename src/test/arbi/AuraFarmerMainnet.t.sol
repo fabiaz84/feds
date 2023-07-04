@@ -209,7 +209,6 @@ contract AuraFarmerTest is Test {
             address(pool), // BPT
             booster,
             l2Chair,
-            l2Gov,
             arbiFedL1,
             address(arbiGovMessengerL1)
         );
