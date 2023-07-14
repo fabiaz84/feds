@@ -7,9 +7,9 @@ interface IVault {
     
     function getInternalBalance(address user, IERC20[] memory tokens) external view returns (uint256[] memory);
     
-    enum PoolSpecialization { GENERAL, MINIMAL_SWAP_INFO, TWO_TOKEN }
+    //enum PoolSpecialization { GENERAL, MINIMAL_SWAP_INFO, TWO_TOKEN }
 
-    function getPool(bytes32 poolId) external view returns (address, PoolSpecialization);
+    function getPool(bytes32 poolId) external view returns (address, uint8);
     
     function getPoolTokenInfo(bytes32 poolId, IERC20 token)
         external

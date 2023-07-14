@@ -88,11 +88,12 @@ contract BalancerComposableStablepoolAdapter {
     @param maxSlippage Maximum amount of value that can be lost in basis points, assuming DOLA = 1$
     */
     function _withdrawAll(uint maxSlippage) internal returns(uint){
+        uint init = dola.balanceOf(address(this));
         uint bptBal = bpt.balanceOf(address(this));
         uint expectedDolaOut = bptBal * bpt.getRate() / 10**18;
         uint minDolaOut = expectedDolaOut - expectedDolaOut * maxSlippage / BPS;
         swapExactIn(address(bpt), address(dola), bptBal, minDolaOut);
-        return dola.balanceOf(address(this));
+        return dola.balanceOf(address(this)) - init;
     }
 
     /**

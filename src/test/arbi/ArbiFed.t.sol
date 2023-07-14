@@ -23,7 +23,6 @@ contract ArbiFedTest is Test {
 
     //Numbas
     uint dolaAmount = 100_000e18;
-    uint maxDailyDelta = 1_000_000e18;
 
     //Feds
     ArbiFed fed;
@@ -39,7 +38,7 @@ contract ArbiFedTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        fed = new ArbiFed(gov, auraFarmerL2, l2Chair, maxDailyDelta);
+        fed = new ArbiFed(gov, auraFarmerL2, l2Chair);
         
         vm.prank(gov);
         DOLA.addMinter(address(fed));
@@ -108,17 +107,6 @@ contract ArbiFedTest is Test {
         fed.resign();
 
         assertEq(fed.chair(), address(0));        
-    }
-
-    function test_setMaxDailyDelta() public {
-        assertEq(fed.maxDailyDelta(), maxDailyDelta);
-
-        uint256 newMaxDailyDelta = 2_000_000e18;
-
-        vm.prank(gov);
-        fed.setMaxDailyDelta(newMaxDailyDelta);
-
-        assertEq(fed.maxDailyDelta(), newMaxDailyDelta); 
     }
 
     function test_changeGov() public {

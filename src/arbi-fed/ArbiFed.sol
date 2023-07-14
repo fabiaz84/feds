@@ -10,9 +10,6 @@ contract ArbiFed {
     address public gov;
     address public l2Chair;
     uint public underlyingSupply;
-    uint public lastDeltaUpdate;
-    uint public maxDailyDelta;
-    uint public dailyDelta;
     uint public gasLimit;
     uint public maxSubmissionCost;
 
@@ -37,15 +34,12 @@ contract ArbiFed {
     constructor(
             address gov_,
             address auraFarmer_,
-            address l2Chair_,
-            uint maxDailyDelta_)
+            address l2Chair_)
     {
         chair = msg.sender;
         gov = gov_;
         auraFarmer = auraFarmer_;
         l2Chair = l2Chair_;
-        maxDailyDelta = maxDailyDelta_; 
-        lastDeltaUpdate = block.timestamp - 1 days;
 
         DOLA.approve(address(l1ERC20Gateway), type(uint).max); 
     }
@@ -61,30 +55,32 @@ contract ArbiFed {
     }
 
     /**
-     * @notice Mints & deposits `amountUnderlying` of `underlying` tokens into Arbitrum Gateway to the `auraFarmer` contract
-     * @param amountUnderlying Amount of underlying token to mint & deposit into Aura farmer on Arbitrum
+     * @notice Mints & deposits `amountToBridge` of DOLA into Arbitrum Gateway to the `auraFarmer` contract
+     * @param amountToBridge Amount of underlying token to briged into Aura farmer on Arbitrum
      * @param gasPriceBid Price per gas unit in ethereum as measured in wei
      */
-    function expansion(uint amountUnderlying, uint256 gasPriceBid) external payable onlyChair {
+    function expansion(uint amountToBridge, uint256 gasPriceBid) external payable onlyChair {
         if (gasPriceBid == 0) revert ZeroGasPriceBid();
         if (msg.value < maxSubmissionCost + gasLimit * gasPriceBid) revert InsufficientGasFunds();
-
-        _updateDailyDelta(amountUnderlying);
-        underlyingSupply += amountUnderlying;
-        DOLA.mint(address(this), amountUnderlying);
+        uint dolaBal = DOLA.balanceOf(address(this));
+        if(dolaBal < amountToBridge){
+            uint amountToMint = amountToBridge - dolaBal;
+            underlyingSupply += amountToMint;
+            DOLA.mint(address(this), amountToMint);
+            emit Expansion(amountToMint);
+        }
         bytes memory data = abi.encode(maxSubmissionCost, "");
 
         gatewayRouter.outboundTransferCustomRefund{value: msg.value}(
             address(DOLA),
             l2Chair,
             auraFarmer,
-            DOLA.balanceOf(address(this)),
+            amountToBridge,
             gasLimit, 
             gasPriceBid, 
             data
         );
 
-        emit Expansion(amountUnderlying);
     }
 
     /**
@@ -112,13 +108,11 @@ contract ArbiFed {
         if (amount == 0) revert CantBurnZeroDOLA();
         if(amount > underlyingSupply){
             DOLA.burn(underlyingSupply);
-            _updateDailyDelta(underlyingSupply);
             DOLA.transfer(gov, amount - underlyingSupply);
             emit Contraction(underlyingSupply);
             underlyingSupply = 0;
         } else {
             DOLA.burn(amount);
-            _updateDailyDelta(amount);
             underlyingSupply -= amount;
             emit Contraction(amount);
         }
@@ -129,31 +123,6 @@ contract ArbiFed {
      */
     function resign() external onlyChair {
         chair = address(0);
-    }
-    
-    /**
-     * @notice Updates dailyDelta and lastDeltaUpdate
-     * @dev This is the only way you should update dailyDelta or lastDeltaUpdate!
-     * @param delta The delta the dailyDelta is updated with
-     */
-    function _updateDailyDelta(uint delta) internal {
-        //If statement isn't strictly necessary, but saves gas as long as function is called less than daily
-        if(lastDeltaUpdate + 1 days <= block.timestamp){
-            dailyDelta = delta;
-        } else {
-            uint freedDelta = maxDailyDelta * (block.timestamp - lastDeltaUpdate) / 1 days;
-            dailyDelta = freedDelta >= dailyDelta ? delta : dailyDelta - freedDelta + delta;
-        }
-        if (dailyDelta > maxDailyDelta) revert DeltaAboveMax();
-        lastDeltaUpdate = block.timestamp;
-    }
-
-    /**
-     * @notice Governance only function for setting maximum daily DOLA supply delta allowed for the fed
-     * @param newMaxDailyDelta The new maximum amount underlyingSupply can be expanded or contracted in a day
-    */
-    function setMaxDailyDelta(uint newMaxDailyDelta) external onlyGov {
-        maxDailyDelta = newMaxDailyDelta;
     }
 
     /**
@@ -171,14 +140,6 @@ contract ArbiFed {
      */
     function setGasLimit(uint newGasLimit) external onlyChair {
         gasLimit = newGasLimit;
-    }
-
-    /**
-     * @notice View function for reading the available daily delta
-     */
-    function availableDailyDelta() public view returns(uint){
-        uint freedDelta = maxDailyDelta * (block.timestamp - lastDeltaUpdate) / 1 days;
-        return freedDelta >= dailyDelta ? maxDailyDelta : maxDailyDelta - dailyDelta + freedDelta;
     }
 
     /**

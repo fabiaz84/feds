@@ -38,7 +38,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
 
     uint public dolaDeposited; // TODO: use this to calculate the amount of DOLA to deposit and if we have profit
     uint public dolaProfit; // TODO: review this variable accounting
-    uint public constant pid = 93; // TODO: USDC-DOLA Aura pool id
+    uint public constant pid = 12;
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
@@ -50,9 +50,8 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
     IERC20 public immutable auraL1 = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     IERC20 public immutable balL1 = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
 
-    // TODO: update addresses for Arbitrum
-    IERC20 public immutable bal;// = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
-    IERC20 public immutable aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
+    IERC20 public immutable bal;
+    IERC20 public immutable aura = IERC20(0x1509706a6c66CA549ff0cB464de88231DDBe213B);
 
     address public arbiFedL1;
     address public arbiGovMessengerL1;
@@ -67,11 +66,11 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         address bpt;
         address booster;
         address l2Chair;
+        address l2Guardian;
         address arbiFedL1;
         address arbiGovMessengerL1;
     }
-
-
+    
     constructor(
         InitialAddresses memory addresses_,
         uint maxLossExpansionBps_,
@@ -93,6 +92,7 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         maxLossWithdrawBps = maxLossWithdrawBps_;
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
         l2Chair = addresses_.l2Chair;
+        l2Guardian = addresses_.l2Guardian;
         arbiFedL1 = addresses_.arbiFedL1;
         arbiGovMessengerL1 = addresses_.arbiGovMessengerL1;
     }
