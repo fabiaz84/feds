@@ -164,14 +164,15 @@ contract AuraFarmerTest is Test {
     function test_takeProfit() public {
         vm.startPrank(l2Chair);
         auraFarmer.deposit(dolaAmount);
+        vm.warp(block.timestamp + 30 days);
         
-        uint twgBalBefore = bal.balanceOf(address(l2TWG));
-        uint twgAuraBefore = aura.balanceOf(address(l2TWG));
-        assertEq(auraFarmer.dolaProfit(), 0);
-        // We call take profit but no rewards are available, still call succeeds
+        uint twgBalBefore = balArbi.balanceOf(address(l2TWG));
+        uint twgAuraBefore = auraArbi.balanceOf(address(l2TWG));
+
         auraFarmer.takeProfit();
-        uint twgBalAfter = bal.balanceOf(address(l2TWG));
-        uint twgAuraAfter = aura.balanceOf(address(l2TWG));
+
+        uint twgBalAfter = balArbi.balanceOf(address(l2TWG));
+        uint twgAuraAfter = auraArbi.balanceOf(address(l2TWG));
         
         assertGt(twgBalAfter, twgBalBefore, "BAL balance didn't increase");
         assertGt(twgAuraAfter, twgAuraBefore, "AURA balance didn't increase");
