@@ -52,6 +52,7 @@ contract AuraFarmerTest is Test {
     address l2MessengerAlias;
     address l2Chair = address(0x69);
     address l2Guardian = address(0x70);
+    address l2TWG = 0x23dEDab98D7828AFBD2B7Ab8C71089f2C517774a;
     address arbiFedL1 = address(0x23);
     IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0xAc7025Dec5E216025C76414f6ac1976227c20Ff0);
     address booster = 0x98Ef32edd24e2c92525E59afc4475C1242a30184;
@@ -88,8 +89,10 @@ contract AuraFarmerTest is Test {
             booster,
             l2Chair,
             l2Guardian,
+            l2TWG,
             arbiFedL1,
-            address(arbiGovMessengerL1)
+            address(arbiGovMessengerL1),
+            gov
         );
 
 
@@ -98,7 +101,6 @@ contract AuraFarmerTest is Test {
             addresses,
             maxLossExpansion,
             maxLossWithdraw,
-            maxLossTakeProfit,
             poolId
         );
 
@@ -162,16 +164,17 @@ contract AuraFarmerTest is Test {
     function test_takeProfit() public {
         vm.startPrank(l2Chair);
         auraFarmer.deposit(dolaAmount);
-
+        
+        uint twgBalBefore = bal.balanceOf(address(l2TWG));
+        uint twgAuraBefore = aura.balanceOf(address(l2TWG));
         assertEq(auraFarmer.dolaProfit(), 0);
         // We call take profit but no rewards are available, still call succeeds
-        auraFarmer.takeProfit(false);
-
-        // we can also attemp to harvest but also there are no profits, still call succeds
-        auraFarmer.takeProfit(true);
-
-        // Profit accountability is still zero
-        assertEq(auraFarmer.dolaProfit(), 0);
+        auraFarmer.takeProfit();
+        uint twgBalAfter = bal.balanceOf(address(l2TWG));
+        uint twgAuraAfter = aura.balanceOf(address(l2TWG));
+        
+        assertGt(twgBalAfter, twgBalBefore, "BAL balance didn't increase");
+        assertGt(twgAuraAfter, twgAuraBefore, "AURA balance didn't increase");
     }
 
     function test_initialized_properly() public {
@@ -216,20 +219,6 @@ contract AuraFarmerTest is Test {
         vm.expectRevert(WithdrawMaxLossTooHigh.selector);
         vm.prank(l2MessengerAlias);
         auraFarmer.setMaxLossWithdrawBps(10000);
-    }
-
-    function test_setMaxLossTakeProfit() public {
-        vm.expectRevert(OnlyL2Guardian.selector);
-        auraFarmer.setMaxLossTakeProfitBps(0);
-
-        vm.prank(l2MessengerAlias);
-        auraFarmer.setMaxLossTakeProfitBps(0);
-
-        assertEq(auraFarmer.maxLossTakeProfitBps(), 0);
-
-        vm.expectRevert(TakeProfitMaxLossTooHigh.selector);
-        vm.prank(l2MessengerAlias);
-        auraFarmer.setMaxLossTakeProfitBps(10000);
     }
 
     function test_changeArbiFedL1() public {
