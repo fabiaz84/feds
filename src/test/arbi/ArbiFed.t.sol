@@ -38,7 +38,7 @@ contract ArbiFedTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        fed = new ArbiFed(gov, auraFarmerL2, l2Chair);
+        fed = new ArbiFed(gov, auraFarmerL2, chair, l2Chair);
         
         vm.prank(gov);
         DOLA.addMinter(address(fed));

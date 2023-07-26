@@ -34,9 +34,10 @@ contract ArbiFed {
     constructor(
             address gov_,
             address auraFarmer_,
+            address chair_,
             address l2Chair_)
     {
-        chair = msg.sender;
+        chair = chair_;
         gov = gov_;
         auraFarmer = auraFarmer_;
         l2Chair = l2Chair_;
@@ -154,6 +155,14 @@ contract ArbiFed {
      */
     function changeChair(address newChair) external onlyGov {
         chair = newChair;
+    }
+
+    /**
+     * @notice Method for gov to change the chair
+     * @dev Address that will receive excess gas on arbitrum
+     */
+    function changeL2Chair(address newL2Chair) external onlyGov {
+        l2Chair = newL2Chair;
     }
 
     /**
