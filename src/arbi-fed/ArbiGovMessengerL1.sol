@@ -12,6 +12,7 @@ contract ArbiGovMessengerL1 {
     
     address public gov;
     address public pendingGov;
+    IInbox inbox;
     mapping(address => bool) public allowList;
 
     struct L2GasParams {
@@ -22,8 +23,9 @@ contract ArbiGovMessengerL1 {
 
     event MessageSent(address to, bytes data);
 
-    constructor (address gov_) {
+    constructor (address gov_, address _inbox) {
         gov = gov_;
+        inbox = IInbox(_inbox);
     }
 
     modifier onlyGov {
@@ -37,7 +39,6 @@ contract ArbiGovMessengerL1 {
     }
     
     function sendMessage(
-        address _inbox,
         address _to,
         address _refundTo,
         address _user,
@@ -49,7 +50,7 @@ contract ArbiGovMessengerL1 {
         
         emit MessageSent(_to, _data);
 
-        return IInbox(_inbox).createRetryableTicket{ value: _l1CallValue }(
+        return inbox.createRetryableTicket{ value: _l1CallValue }(
             _to,
             _l2CallValue,
             _l2GasParams._maxSubmissionCost,
@@ -61,11 +62,8 @@ contract ArbiGovMessengerL1 {
         );
     }
 
-    function depositEth(
-        address _inbox
-    ) external payable onlyGov() returns (uint256) {
-
-        return IInbox(_inbox).depositEth{ value: msg.value }();
+    function depositEth() external payable onlyGov() returns (uint256) {
+        return inbox.depositEth{ value: msg.value }();
     }
 
     function setPendingGov(address newPendingGov) external onlyGov {
@@ -76,6 +74,10 @@ contract ArbiGovMessengerL1 {
         if(msg.sender != pendingGov) revert OnlyPendingGov();
         gov = pendingGov;
         pendingGov = address(0);
+    }
+
+    function setInbox(address _newInbox) external onlyGov {
+        inbox = IInbox(_newInbox);
     }
 
     function setAllowed(address allowee, bool isAllowed) external onlyGov {
