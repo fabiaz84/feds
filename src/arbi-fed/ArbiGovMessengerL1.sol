@@ -82,7 +82,7 @@ contract ArbiGovMessengerL1 is ArbiGasManager{
             gasLimit * gasPrice, //TODO: Check if this needs to include maxSubmissionCost
             maxSubmissionCost,
             refundAddress,
-            gasClerk, // gasClerk can cancel the retryable ticket and receive call value refund
+            refundAddress, // refundAddress can cancel the retryable ticket and receive call value refund
             gasLimit,
             gasPrice,
             _data
