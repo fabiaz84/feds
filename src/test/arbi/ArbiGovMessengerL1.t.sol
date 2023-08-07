@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "src/interfaces/IERC20.sol";
 import {IDola} from "src/interfaces/velo/IDola.sol";
-import {ArbiGovMessengerL1} from "src/arbi-fed/ArbiGovMessengerL1.sol";
+import "src/arbi-fed/ArbiGovMessengerL1.sol";
 import {AuraFarmer} from "src/arbi-fed/AuraFarmer.sol";
 import {IInbox} from "arbitrum-nitro/contracts/src/bridge/IInbox.sol";
 
@@ -33,6 +33,7 @@ contract ArbiGovMessengerL1Test is Test {
 
     
     error OnlyGov();
+    error OnlyAllowed();
     error OnlyChair();
     error DeltaAboveMax();
     
@@ -41,7 +42,7 @@ contract ArbiGovMessengerL1Test is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        messenger = new ArbiGovMessengerL1(gov);
+        messenger = new ArbiGovMessengerL1(gov, delayedInbox, chair);
         
         // vm.prank(gov);
         // DOLA.addMinter(address(fed));
@@ -54,21 +55,49 @@ contract ArbiGovMessengerL1Test is Test {
         uint _l2CallValue = 0.1 ether;
         bytes memory _data = abi.encodeWithSelector(AuraFarmer.changeL2Chair.selector, newChair);
         
-        ArbiGovMessengerL1.L2GasParams memory _l2GasParams = ArbiGovMessengerL1.L2GasParams(0.05 ether, 195000,300000000);
+        ArbiGasManager.L2GasParams memory _l2GasParams = ArbiGasManager.L2GasParams(0.05 ether, 195000,300000000);
         payable(gov).transfer(2 ether);
         vm.prank(gov);
-        messenger.sendMessage{value:0.16 ether}(delayedInbox, chair, chair, chair, _l1CallValue, _l2CallValue, _l2GasParams, _data);
+        messenger.sendMessage{value:0.16 ether}(chair, chair, chair, _l1CallValue, _l2CallValue, _l2GasParams, _data);
 
-        vm.expectRevert(OnlyGov.selector); 
-        messenger.sendMessage{value:0.16 ether}(delayedInbox, chair, chair, chair, _l1CallValue, _l2CallValue, _l2GasParams, _data);
-        }
-
-
-    function test_depositETH() public {
-        uint amount = 0.1 ether;
-        payable(gov).transfer(amount);
-        vm.startPrank(gov);
-        messenger.depositEth{value:amount}(delayedInbox);
+        vm.expectRevert(OnlyAllowed.selector); 
+        messenger.sendMessage{value:0.16 ether}(chair, chair, chair, _l1CallValue, _l2CallValue, _l2GasParams, _data);
     }
-   
+
+    function test_sendMessageOverload_changeL2Chair() public {
+        address newChair = address(0x70);
+        bytes4 selector = AuraFarmer.changeL2Chair.selector;
+        bytes memory _data = abi.encodeWithSelector(selector, newChair);
+        
+        payable(gov).transfer(2 ether);
+        vm.prank(gov);
+        messenger.sendMessage{value:0.16 ether}(chair, selector, _data);
+        vm.expectRevert(OnlyAllowed.selector); 
+        messenger.sendMessage{value:0.16 ether}(chair, selector, _data);
+    }
+
+    function test_setInbox() public {
+        address inboxBefore = address(messenger.inbox());
+        vm.expectRevert(OnlyGov.selector);
+        messenger.setInbox(address(0));
+
+        vm.prank(gov);
+        messenger.setInbox(address(0));
+        assertEq(address(messenger.inbox()), address(0));
+        assertFalse(inboxBefore == address(messenger.inbox()));
+    }
+
+    function test_setAllowed() public {
+        vm.expectRevert(OnlyGov.selector);
+        messenger.setAllowed(address(0), true);
+        assertFalse(messenger.allowList(address(0)));
+
+        vm.prank(gov);
+        messenger.setAllowed(address(0), true);
+        assertEq(messenger.allowList(address(0)), true);
+
+        vm.prank(gov);
+        messenger.setAllowed(address(0), false);
+        assertFalse(messenger.allowList(address(0)));
+    }
 }

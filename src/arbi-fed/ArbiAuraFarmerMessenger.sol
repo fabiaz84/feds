@@ -1,80 +1,60 @@
 pragma solidity ^0.8.13;
-import "src/arbi-fed/ArbiGasManager.sol";
 import "src/arbi-fed/ArbiGovMessengerL1.sol";
-import "src/arbi-fed/ArbiFed.sol";
 import "src/arbi-fed/AuraFarmer.sol";
+import "src/arbi-fed/Governable.sol";
 
 
-contract ArbiAuraFarmerMessenger is ArbiGasManager {
+contract ArbiAuraFarmerMessenger is Governable{
     
     ArbiGovMessengerL1 arbiGovMessenger;
     address auraFarmerL2;
 
     constructor(
         address _gov,
-        address _gasClerk,
         address _arbiGovMessenger
-    ) ArbiGasManager(_gov, _gasClerk) {
+    ) Governable(_gov) {
         arbiGovMessenger = ArbiGovMessengerL1(_arbiGovMessenger);
     }
 
-    function _sendMessage(bytes memory _data) internal {
-
-        ArbiGovMessengerL1.L2GasParams memory gasParams;
-        gasParams._maxSubmissionCost = maxSubmissionCost;
-        gasParams._maxGas = gasLimit;
-        gasParams._gasPriceBid = gasPrice;
-        arbiGovMessenger.sendMessage(
-            auraFarmerL2,
-            refundAddress,
-            gasClerk,
-            msg.value, //TODO: May not be right, do check
-            0, //TODO: Find out what to put here
-            gasParams,
-            _data
-        );
-    }
-
     function changeL2Chair(address _newL2Chair) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.changeL2Chair, _newL2Chair);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.changeL2Chair.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newL2Chair);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
     function changeL2Guardian(address _newL2Guardian) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.changeL2Guardian, _newL2Guardian);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.changeL2Guardian.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newL2Guardian);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
     function changeL2TWG(address _newL2TWG) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.changeL2TWG, _newL2TWG);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.changeL2TWG.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newL2TWG);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
     function changeArbiFedL1(address _newArbiFedL1) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.changeArbiFedL1, _newArbiFedL1);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.changeArbiFedL1.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newArbiFedL1);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
     function changeArbiGovMessengerL1(address _newArbiGovMessengerL1) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.changeArbiGovMessengerL1, _newArbiGovMessengerL1);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.changeArbiGovMessengerL1.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newArbiGovMessengerL1);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
     function changeTreasuryL1(address _newTreasuryL1) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.changeTreasuryL1, _newTreasuryL1);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.changeTreasuryL1.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newTreasuryL1);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
     function setMaxLossSetableByGuardianBps(uint _newMaxLossSetableByGuardianBps) external onlyGov {
-        bytes memory data = abi.encodeCall(AuraFarmer.setMaxLossSetableByGuardianBps, _newMaxLossSetableByGuardianBps);
-        _sendMessage(data);
+        bytes4 selector = AuraFarmer.setMaxLossSetableByGuardianBps.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newMaxLossSetableByGuardianBps);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
-
-
-
-    
-
-
-
-
 }
