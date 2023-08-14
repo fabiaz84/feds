@@ -2,8 +2,8 @@ pragma solidity ^0.8.13;
 
 abstract contract Governable {
 
-    address gov;
-    address pendingGov;
+    address public gov;
+    address public pendingGov;
 
     constructor(address _gov){
         gov = _gov;

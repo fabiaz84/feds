@@ -21,9 +21,10 @@ contract ArbiGasManager is Governable{
 
     constructor(address _gov, address _gasClerk) Governable(_gov){
         gasClerk = _gasClerk;
+        refundAddress = _gasClerk;
         defaultGasLimit = 10**6; //Same gas stipend as Optimism bridge
-        maxSubmissionCost = 0.1 ether;
-        gasPriceCeiling = 10**10; //10 gWEI
+        maxSubmissionCost = 0.01 ether;
+        gasPriceCeiling = 10**9; //1 gWEI
     }
 
     error OnlyGasClerk();

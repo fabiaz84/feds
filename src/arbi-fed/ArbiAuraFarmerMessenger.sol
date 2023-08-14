@@ -6,14 +6,18 @@ import "src/arbi-fed/Governable.sol";
 
 contract ArbiAuraFarmerMessenger is Governable{
     
-    ArbiGovMessengerL1 arbiGovMessenger;
-    address auraFarmerL2;
+    ArbiGovMessengerL1 public arbiGovMessenger;
+    address public auraFarmerL2;
 
     constructor(
         address _gov,
         address _arbiGovMessenger
     ) Governable(_gov) {
-        arbiGovMessenger = ArbiGovMessengerL1(_arbiGovMessenger);
+        arbiGovMessenger = ArbiGovMessengerL1(payable(_arbiGovMessenger));
+    }
+
+    function setAuraFarmerL2(address _auraFarmerL2) external onlyGov {
+        auraFarmerL2 = _auraFarmerL2;
     }
 
     function changeL2Chair(address _newL2Chair) external onlyGov {

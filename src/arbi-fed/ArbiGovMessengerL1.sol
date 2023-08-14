@@ -77,9 +77,9 @@ contract ArbiGovMessengerL1 is ArbiGasManager{
         uint gasLimit = functionGasLimit[functionId];
         if(gasLimit == 0) gasLimit = defaultGasLimit;
 
-        return inbox.createRetryableTicket{ value: msg.value }(
+        return inbox.createRetryableTicket{ value: gasLimit * gasPrice + maxSubmissionCost}(
             _to,
-            gasLimit * gasPrice, //TODO: Check if this needs to include maxSubmissionCost
+            gasLimit * gasPrice,
             maxSubmissionCost,
             refundAddress,
             refundAddress, // refundAddress can cancel the retryable ticket and receive call value refund
@@ -106,4 +106,14 @@ contract ArbiGovMessengerL1 is ArbiGasManager{
     function setAllowed(address allowee, bool isAllowed) external onlyGov {
         allowList[allowee] = isAllowed;
     }
+
+    /**
+     * @notice Sweep Eth to gov
+     */
+    function sweepEth() external onlyGov {
+        uint amount = address(this).balance;
+        payable(gov).transfer(amount);
+    }
+
+    receive() external payable{}
 }
