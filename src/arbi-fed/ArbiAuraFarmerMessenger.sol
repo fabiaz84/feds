@@ -56,7 +56,19 @@ contract ArbiAuraFarmerMessenger is Governable{
         arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
     }
 
-    function setMaxLossSetableByGuardianBps(uint _newMaxLossSetableByGuardianBps) external onlyGov {
+    function changeMaxLossExpansionBps(uint _newMaxLossExpansionBps) external onlyGov {
+        bytes4 selector = AuraFarmer.setMaxLossExpansionBps.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newMaxLossExpansionBps);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
+    }
+
+    function changeMaxLossWithdrawBps(uint _newMaxLossWithdrawBps) external onlyGov {
+        bytes4 selector = AuraFarmer.setMaxLossWithdrawBps.selector;
+        bytes memory data = abi.encodeWithSelector(selector, _newMaxLossWithdrawBps);
+        arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);
+    }
+
+    function changeMaxLossSetableByGuardianBps(uint _newMaxLossSetableByGuardianBps) external onlyGov {
         bytes4 selector = AuraFarmer.setMaxLossSetableByGuardianBps.selector;
         bytes memory data = abi.encodeWithSelector(selector, _newMaxLossSetableByGuardianBps);
         arbiGovMessenger.sendMessage(auraFarmerL2, selector, data);

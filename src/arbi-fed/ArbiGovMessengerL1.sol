@@ -79,7 +79,7 @@ contract ArbiGovMessengerL1 is ArbiGasManager{
 
         return inbox.createRetryableTicket{ value: gasLimit * gasPrice + maxSubmissionCost}(
             _to,
-            gasLimit * gasPrice,
+            0,
             maxSubmissionCost,
             refundAddress,
             refundAddress, // refundAddress can cancel the retryable ticket and receive call value refund
