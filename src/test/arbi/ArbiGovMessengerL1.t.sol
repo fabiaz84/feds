@@ -42,7 +42,7 @@ contract ArbiGovMessengerL1Test is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        messenger = new ArbiGovMessengerL1(gov, delayedInbox, chair);
+        messenger = new ArbiGovMessengerL1(gov, delayedInbox, chair, chair);
         
         // vm.prank(gov);
         // DOLA.addMinter(address(fed));

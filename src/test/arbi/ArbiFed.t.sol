@@ -38,7 +38,7 @@ contract ArbiFedTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        fed = new ArbiFed(gov, auraFarmerL2, chair, l2Chair);
+        fed = new ArbiFed(gov, auraFarmerL2, chair, chair, chair);
         
         vm.prank(gov);
         DOLA.addMinter(address(fed));
@@ -50,19 +50,20 @@ contract ArbiFedTest is Test {
         uint256 gasPrice = 300000000;
         uint gasLimit = 275000;
         uint maxSubmissionCost = 0.05 ether;
-        fed.setGasLimit(gasLimit);
+        fed.setDefaultGasLimit(gasLimit);
         fed.setMaxSubmissionCost(maxSubmissionCost);
+        fed.setGasPrice(gasPrice);
         vm.stopPrank();
 
         assertEq(DOLA.balanceOf(address(fed)),0);
 
-        fed.expansion{value: maxSubmissionCost + gasLimit * gasPrice}(dolaAmount, gasPrice);
+        fed.expansion{value: maxSubmissionCost + gasLimit * gasPrice}(dolaAmount);
 
         assertEq(DOLA.balanceOf(address(fed)),0);
 
 
         vm.expectRevert(DeltaAboveMax.selector);
-        fed.expansion{value: maxSubmissionCost + gasLimit * gasPrice}(dolaAmount * 10, gasPrice);
+        fed.expansion{value: maxSubmissionCost + gasLimit * gasPrice}(dolaAmount * 10);
     }
 
     function test_contraction() public {
@@ -107,19 +108,6 @@ contract ArbiFedTest is Test {
         fed.resign();
 
         assertEq(fed.chair(), address(0));        
-    }
-
-    function test_changeGov() public {
-        vm.expectRevert(OnlyGov.selector);
-        vm.prank(chair);
-        fed.changeGov(address(0x699));
-
-        assertEq(fed.gov(), gov);
-
-        vm.prank(gov);
-        fed.changeGov(address(0x699));
-
-        assertEq(fed.gov(), address(0x699));
     }
 
     function test_changeChair() public {

@@ -12,7 +12,9 @@ contract ArbiGovMessengerL1 is ArbiGasManager{
 
     event MessageSent(address to, bytes data);
 
-    constructor (address _gov, address _inbox, address _gasClerk) ArbiGasManager(gov, _gasClerk){
+    constructor (address _gov, address _inbox, address _gasClerk, address _l2RefundAddress)
+        ArbiGasManager(gov, _gasClerk, _l2RefundAddress)
+    {
         gov = _gov;
         inbox = IInbox(_inbox);
     }

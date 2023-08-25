@@ -77,7 +77,7 @@ contract AuraFarmerTest is Test {
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("arbitrum"));//, 93907980);
 
-        arbiGovMessengerL1 = new ArbiGovMessengerL1(gov,gov,address(0));
+        arbiGovMessengerL1 = new ArbiGovMessengerL1(gov,gov,address(0),address(0));
         
         l2MessengerAlias = AddressAliasHelper.applyL1ToL2Alias(address(arbiGovMessengerL1));
 

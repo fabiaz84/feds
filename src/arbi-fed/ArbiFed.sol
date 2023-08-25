@@ -3,15 +3,12 @@ pragma solidity ^0.8.13;
 import "src/interfaces/IERC20.sol";
 import "src/interfaces/velo/IDola.sol";
 import "src/interfaces/velo/IL1ERC20Bridge.sol";
+import "src/arbi-fed/ArbiGasManager.sol";
 import {IL1GatewayRouter} from "arbitrum/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
 
-contract ArbiFed {
+contract ArbiFed is ArbiGasManager{
     address public chair;
-    address public gov;
-    address public l2Chair;
     uint public underlyingSupply;
-    uint public gasLimit;
-    uint public maxSubmissionCost;
 
     IDola public immutable DOLA = IDola(0x865377367054516e17014CcdED1e7d814EDC9ce4);
     IL1GatewayRouter public immutable gatewayRouter = IL1GatewayRouter(0x72Ce9c846789fdB6fC1f34aC4AD25Dd9ef7031ef); 
@@ -23,7 +20,6 @@ contract ArbiFed {
     event Expansion(uint amount);
     event Contraction(uint amount);
 
-    error OnlyGov();
     error OnlyChair();
     error OnlyGuardian();
     error CantBurnZeroDOLA();
@@ -32,22 +28,18 @@ contract ArbiFed {
     error InsufficientGasFunds();
     
     constructor(
-            address gov_,
-            address auraFarmer_,
-            address chair_,
-            address l2Chair_)
+            address _gov,
+            address _auraFarmer,
+            address _chair,
+            address _gasClerk,
+            address _l2RefundAddress
+    ) ArbiGasManager(_gov, _gasClerk, _l2RefundAddress)
     {
-        chair = chair_;
-        gov = gov_;
-        auraFarmer = auraFarmer_;
-        l2Chair = l2Chair_;
+        chair = _chair;
+        gov = _gov;
+        auraFarmer = _auraFarmer;
 
         DOLA.approve(address(l1ERC20Gateway), type(uint).max); 
-    }
-
-    modifier onlyGov {
-        if (msg.sender != gov) revert OnlyGov();
-        _;
     }
 
     modifier onlyChair {
@@ -58,11 +50,10 @@ contract ArbiFed {
     /**
      * @notice Mints & deposits `amountToBridge` of DOLA into Arbitrum Gateway to the `auraFarmer` contract
      * @param amountToBridge Amount of underlying token to briged into Aura farmer on Arbitrum
-     * @param gasPriceBid Price per gas unit in ethereum as measured in wei
      */
-    function expansion(uint amountToBridge, uint256 gasPriceBid) external payable onlyChair {
-        if (gasPriceBid == 0) revert ZeroGasPriceBid();
-        if (msg.value < maxSubmissionCost + gasLimit * gasPriceBid) revert InsufficientGasFunds();
+    function expansion(uint amountToBridge) external payable onlyChair {
+        if (gasPrice == 0) revert ZeroGasPriceBid();
+        if (msg.value < maxSubmissionCost + defaultGasLimit * gasPrice) revert InsufficientGasFunds();
         uint dolaBal = DOLA.balanceOf(address(this));
         if(dolaBal < amountToBridge){
             uint amountToMint = amountToBridge - dolaBal;
@@ -71,14 +62,13 @@ contract ArbiFed {
             emit Expansion(amountToMint);
         }
         bytes memory data = abi.encode(maxSubmissionCost, "");
-
         gatewayRouter.outboundTransferCustomRefund{value: msg.value}(
             address(DOLA),
-            l2Chair,
+            refundAddress,
             auraFarmer,
             amountToBridge,
-            gasLimit, 
-            gasPriceBid, 
+            defaultGasLimit, 
+            gasPrice, 
             data
         );
 
@@ -127,42 +117,10 @@ contract ArbiFed {
     }
 
     /**
-     * @notice Fedchair function for setting the max submission cost as measured in wei
-     * @dev The max submission cost is the cost of having a ticket resubmitted and kept in memory in case of it not going through the first time due to high gas on L1
-     * @param newMaxSubmissionCost new max submission cost
-     */
-    function setMaxSubmissionCost(uint newMaxSubmissionCost) external onlyChair {
-        maxSubmissionCost = newMaxSubmissionCost; 
-    }
-    
-    /**
-     * @notice Sets the gas limit for calls made on the Arbitrum network by the bridge
-     * @param newGasLimit The new gas limit
-     */
-    function setGasLimit(uint newGasLimit) external onlyChair {
-        gasLimit = newGasLimit;
-    }
-
-    /**
-     * @notice Method for gov to change gov address
-     */
-    function changeGov(address newGov) external onlyGov {
-        gov = newGov;
-    }
-
-    /**
      * @notice Method for gov to change the chair
      */
     function changeChair(address newChair) external onlyGov {
         chair = newChair;
-    }
-
-    /**
-     * @notice Method for gov to change the chair
-     * @dev Address that will receive excess gas on arbitrum
-     */
-    function changeL2Chair(address newL2Chair) external onlyGov {
-        l2Chair = newL2Chair;
     }
 
     /**
