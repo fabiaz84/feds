@@ -70,8 +70,9 @@ contract ArbiGovMessengerL1Test is Test {
         bytes memory _data = abi.encodeWithSelector(selector, newChair);
         
         payable(gov).transfer(2 ether);
-        vm.prank(gov);
-        messenger.sendMessage{value:0.16 ether}(chair, selector, _data);
+        vm.startPrank(gov);
+        messenger.sendMessage{value:messenger.getDefaultMinimumCallValue()}(chair, selector, _data);
+        vm.stopPrank();
         vm.expectRevert(OnlyAllowed.selector); 
         messenger.sendMessage{value:0.16 ether}(chair, selector, _data);
     }

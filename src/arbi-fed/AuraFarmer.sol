@@ -274,9 +274,8 @@ contract AuraFarmer is BalancerComposableStablepoolAdapter {
         if(auraBalance > 0) aura.transfer(l2TWG, auraBalance);
     }
     
-    // Bridiging back to L1 TODO: review this bridging code
     /**
-    @notice Withdraws `dolaAmount` of DOLA to arbiFed on L1. Will take 7 days before withdraw is claimable on L1.
+    * @notice Withdraws `dolaAmount` of DOLA to arbiFed on L1. Will take 7 days before withdraw is claimable on L1.
     */
     function withdrawToL1ArbiFed(uint dolaAmount) external onlyChair {
         if (dolaAmount > dola.balanceOf(address(this))) revert NotEnoughTokens();
