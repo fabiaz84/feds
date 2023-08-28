@@ -13,9 +13,11 @@ contract ArbiAuraFarmerMessenger is Governable{
 
     constructor(
         address _gov,
-        address _arbiGovMessenger
+        address _arbiGovMessenger,
+        address _auraFarmerL2
     ) Governable(_gov) {
         arbiGovMessenger = ArbiGovMessengerL1(payable(_arbiGovMessenger));
+        auraFarmerL2 = _auraFarmerL2;
     }
 
     function setAuraFarmerL2(address _auraFarmerL2) external onlyGov {
