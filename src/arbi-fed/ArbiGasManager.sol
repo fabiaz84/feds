@@ -24,6 +24,7 @@ contract ArbiGasManager is Governable{
         refundAddress = _l2RefundAddress;
         defaultGasLimit = 10**6; //Same gas stipend as Optimism bridge
         maxSubmissionCost = 0.01 ether;
+        maxSubmisisonCostCeiling = 0.05 ether;
         gasPriceCeiling = 2 * 10**10; //20 gWEI
         gasPrice = 10**9; //1 gWEI
     }
