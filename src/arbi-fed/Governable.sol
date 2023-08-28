@@ -18,7 +18,7 @@ abstract contract Governable {
     }
 
     modifier onlyPendingGov() {
-        if(msg.sender != gov) revert OnlyPendingGov();
+        if(msg.sender != pendingGov) revert OnlyPendingGov();
         _;
     }
 
