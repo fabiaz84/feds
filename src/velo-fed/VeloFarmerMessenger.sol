@@ -45,7 +45,6 @@ interface ICrossDomainMessenger {
 contract VeloFarmerMessenger {
     ICrossDomainMessenger constant crossDomainMessenger = ICrossDomainMessenger(0x25ace71c97B33Cc4729CF772ae268934F7ab5fA1);
     address public veloFed;
-
     address public gov;
     address public pendingGov;
     address public guardian;
@@ -204,5 +203,9 @@ contract VeloFarmerMessenger {
 
     function changeMessengerGuardian(address newGuardian_) public onlyGov {
         guardian = newGuardian_;
+    }
+
+    function setVeloFed(address veloFed_) public onlyGov {
+        veloFed = veloFed_;
     }
 }
