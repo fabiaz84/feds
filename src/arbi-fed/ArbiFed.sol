@@ -36,7 +36,6 @@ contract ArbiFed is ArbiGasManager{
     ) ArbiGasManager(_gov, _gasClerk, _l2RefundAddress)
     {
         chair = _chair;
-        gov = _gov;
         auraFarmer = _auraFarmer;
 
         DOLA.approve(address(l1ERC20Gateway), type(uint).max); 
