@@ -7,9 +7,9 @@ interface IVault {
     
     function getInternalBalance(address user, IERC20[] memory tokens) external view returns (uint256[] memory);
     
-    enum PoolSpecialization { GENERAL, MINIMAL_SWAP_INFO, TWO_TOKEN }
+    //enum PoolSpecialization { GENERAL, MINIMAL_SWAP_INFO, TWO_TOKEN }
 
-    function getPool(bytes32 poolId) external view returns (address, PoolSpecialization);
+    function getPool(bytes32 poolId) external view returns (address, uint8);
     
     function getPoolTokenInfo(bytes32 poolId, IERC20 token)
         external
@@ -82,4 +82,11 @@ interface IVault {
         uint256 limit,
         uint256 deadline
     ) external payable returns (uint256);
+
+    enum JoinKind {
+        INIT,
+        EXACT_TOKENS_IN_FOR_BPT_OUT,
+        TOKEN_IN_FOR_EXACT_BPT_OUT
+    }
+    
 }

@@ -12,7 +12,7 @@ interface IMintable is IERC20 {
 }
 
 contract Swapper is BalancerComposableStablepoolAdapter {
-    constructor(bytes32 poolId_, address dola_, address vault_) BalancerComposableStablepoolAdapter(poolId_, dola_, vault_){}
+    constructor(bytes32 poolId_, address dola_, address vault_, address bpt_) BalancerComposableStablepoolAdapter(poolId_, dola_, vault_, bpt_){}
 
     function swapExact(address assetIn, address assetOut, uint amount) public{
         swapExactIn(assetIn, assetOut, amount, 1);
@@ -41,21 +41,27 @@ contract AuraFedTest is DSTest{
     Swapper swapper;
 
     function setUp() public {
-        fed = new AuraFed(
+
+        AuraFed.InitialAddresses memory addresses = AuraFed.InitialAddresses(
             address(dola), 
             address(aura), 
             vault, 
             address(baseRewardPool),
+            address(bpt),
             booster,
             chair,
             guardian,
-            gov,
+            gov
+        );
+
+        fed = new AuraFed(
+            addresses,
             maxLossExpansion,
             maxLossWithdraw,
             maxLossTakeProfit,
             poolId
         );
-        swapper = new Swapper(poolId, address(dola), vault);
+        swapper = new Swapper(poolId, address(dola), vault, address(bpt));
         vm.startPrank(gov);
         dola.addMinter(address(fed));
         dola.addMinter(minter);

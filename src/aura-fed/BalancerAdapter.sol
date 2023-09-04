@@ -2,6 +2,7 @@ pragma solidity ^0.8.13;
 
 import "src/interfaces/balancer/IVault.sol";
 import "src/interfaces/IERC20.sol";
+import {console} from "forge-std/console.sol";
 
 interface IBPT is IERC20{
     function getPoolId() external view returns (bytes32);
@@ -13,15 +14,16 @@ contract BalancerComposableStablepoolAdapter {
     uint constant BPS = 10_000;
     bytes32 immutable poolId;
     IERC20 immutable dola;
-    IBPT immutable bpt = IBPT(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
+    IBPT immutable bpt;
     IVault immutable vault;
     IVault.FundManagement fundMan;
     
-    constructor(bytes32 poolId_, address dola_, address vault_){
+    constructor(bytes32 poolId_, address dola_, address vault_, address bpt_){
         poolId = poolId_;
         dola = IERC20(dola_);
         vault = IVault(vault_);
         dola.approve(vault_, type(uint).max);
+        bpt = IBPT(bpt_);
         bpt.approve(vault_, type(uint).max);
         fundMan.sender = address(this);
         fundMan.fromInternalBalance = false;
@@ -86,11 +88,12 @@ contract BalancerComposableStablepoolAdapter {
     @param maxSlippage Maximum amount of value that can be lost in basis points, assuming DOLA = 1$
     */
     function _withdrawAll(uint maxSlippage) internal returns(uint){
+        uint init = dola.balanceOf(address(this));
         uint bptBal = bpt.balanceOf(address(this));
         uint expectedDolaOut = bptBal * bpt.getRate() / 10**18;
         uint minDolaOut = expectedDolaOut - expectedDolaOut * maxSlippage / BPS;
         swapExactIn(address(bpt), address(dola), bptBal, minDolaOut);
-        return dola.balanceOf(address(this));
+        return dola.balanceOf(address(this)) - init;
     }
 
     /**
