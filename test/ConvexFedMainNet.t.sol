@@ -28,6 +28,7 @@ contract ConvexFedTest is DSTest {
     IERC20 public fraxBP = IERC20(0x3175Df0976dFA876431C2E9eE6Bc45b65d3473CC);
     address public gov = 0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
     address public chair = address(0xB);
+    address public guardian = address(0xC);
     address public dolaFaucet = address(0xF);
     uint public maxLossExpansionBps = 100;
     uint public maxLossWithdrawBps = 100;
@@ -42,6 +43,7 @@ contract ConvexFedTest is DSTest {
             address(baseRewardPool),
             chair,
             gov,
+            guardian,
             maxLossExpansionBps,
             maxLossWithdrawBps,
             maxLossTakeProfitBps
@@ -113,7 +115,7 @@ contract ConvexFedTest is DSTest {
         vm.assume(amount > 10**18);
         vm.prank(chair);
         convexFed.expansion(amount);
-        washTrade(1_000_000 ether, 100);
+        washTrade(5_000_000 ether, 100);
         uint initialDolaSupply = convexFed.dolaSupply();
         uint initialDolaTotalSupply = dola.totalSupply();
         uint initialCrvLpSupply = convexFed.crvLpSupply();
@@ -153,7 +155,7 @@ contract ConvexFedTest is DSTest {
     function testContractAll_succeed_whenContractedWithProfit() public {
         vm.prank(chair);
         convexFed.expansion(100_000 ether);
-        washTrade(100_000 ether, 100);
+        washTrade(5000_000 ether, 100);
         uint initialDolaSupply = convexFed.dolaSupply();
         uint initialDolaTotalSupply = dola.totalSupply();
         uint initialGovDola = dola.balanceOf(gov);

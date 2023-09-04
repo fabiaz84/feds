@@ -15,6 +15,7 @@ contract ConvexFed is CurvePoolAdapter{
     IERC20 public CVX;
     address public chair; // Fed Chair
     address public gov;
+    address public guardian;
     uint public dolaSupply;
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
@@ -31,6 +32,7 @@ contract ConvexFed is CurvePoolAdapter{
             address baseRewardPool_, 
             address chair_,
             address gov_, 
+            address guardian_,
             uint maxLossExpansionBps_,
             uint maxLossWithdrawBps_,
             uint maxLossTakeProfitBps_)
@@ -48,6 +50,7 @@ contract ConvexFed is CurvePoolAdapter{
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
         chair = chair_;
         gov = gov_;
+        guardian = guardian_;
     }
 
     /**
@@ -65,9 +68,16 @@ contract ConvexFed is CurvePoolAdapter{
         require(msg.sender == gov, "ONLY GOV");
         chair = newChair_;
     }
+    /**
+    @notice Method for gov to change the guardian
+    */
+    function changeGuardian(address newGuardian_) public {
+        require(msg.sender == gov, "ONLY GOV");
+        guardian = newGuardian_;
+    }
 
     /**
-    @notice Method for current chair of the Yearn FED to resign
+    @notice Method for current to resign
     */
     function resign() public {
         require(msg.sender == chair, "ONLY CHAIR");
@@ -85,11 +95,11 @@ contract ConvexFed is CurvePoolAdapter{
     }
 
     /**
-    @notice Set the maximum acceptable loss when withdrawing dola supply. Only callable by gov.
+    @notice Set the maximum acceptable loss when withdrawing dola supply. Only callable by gov or guardian.
     @param newMaxLossWithdrawBps The maximum loss allowed by basis points 1 = 0.01%
     */
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
-        require(msg.sender == gov, "ONLY GOV");
+        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV");
         require(newMaxLossWithdrawBps <= 10000, "Can't have max loss above 100%");
         maxLossWithdrawBps = newMaxLossWithdrawBps;
     }
@@ -140,15 +150,8 @@ contract ConvexFed is CurvePoolAdapter{
         //Withdraw DOLA from curve pool
         uint dolaWithdrawn = metapoolWithdraw(amountDola, maxLossWithdrawBps);
         require(dolaWithdrawn > 0, "Must contract");
-        if(dolaWithdrawn > dolaSupply){
-            dola.transfer(gov, dolaWithdrawn - dolaSupply);
-            dola.burn(dolaSupply);
-            dolaSupply = 0;
-        } else {
-            dola.burn(dolaWithdrawn);
-            dolaSupply = dolaSupply - dolaWithdrawn;
-        }
-        emit Contraction(dolaWithdrawn);
+        uint burnAmount = _burnAndPay();
+        emit Contraction(burnAmount);
     }
 
     /**
@@ -159,16 +162,9 @@ contract ConvexFed is CurvePoolAdapter{
         require(msg.sender == chair, "ONLY CHAIR");
         baseRewardPool.withdrawAllAndUnwrap(false);
         uint dolaMinOut = dolaSupply * (10_000 - maxLossWithdrawBps) / 10_000;
-        uint dolaOut = crvMetapool.remove_liquidity_one_coin(crvLpSupply(), 0, dolaMinOut);
-        if(dolaOut > dolaSupply){
-            dola.transfer(gov, dolaOut - dolaSupply);
-            dola.burn(dolaSupply);
-            dolaSupply = 0;
-        } else {
-            dola.burn(dolaOut);
-            dolaSupply -= dolaOut;
-        }
-        emit Contraction(dolaOut);
+        crvMetapool.remove_liquidity_one_coin(crvLpSupply(), 0, dolaMinOut);
+        uint burnAmount = _burnAndPay();
+        emit Contraction(burnAmount);
     }
 
 
@@ -193,6 +189,31 @@ contract ConvexFed is CurvePoolAdapter{
         require(baseRewardPool.getReward());
         crv.transfer(gov, crv.balanceOf(address(this)));
         CVX.transfer(gov, CVX.balanceOf(address(this)));
+    }
+
+    /**
+    @notice Burns the remaining dola supply. Useful in case of the FED being completely contracted and wanting to pay off remaining bad debts.
+    */
+    function burnRemainingDolaSupply() public {
+        dola.transferFrom(msg.sender, address(this), dolaSupply);
+        _burnAndPay();
+    }
+
+    /**
+    @notice Burns all dola tokens held by the fed up to the dolaSupply, taking any surplus as profit.
+    */
+    function _burnAndPay() internal returns(uint burnAmount){
+        uint dolaBal = dola.balanceOf(address(this));
+        if(dolaBal > dolaSupply){
+            IERC20(dola).transfer(gov, dolaBal - dolaSupply);
+            IERC20(dola).burn(dolaSupply);
+            burnAmount = dolaSupply;
+            dolaSupply = 0;
+        } else {
+            IERC20(dola).burn(dolaBal);
+            burnAmount = dolaBal;
+            dolaSupply -= dolaBal;
+        }
     }
     
     /**
