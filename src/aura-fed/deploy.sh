@@ -1,15 +1,15 @@
-dola=0x865377367054516e17014CcdED1e7d814EDC9ce4;
+dola=0x865377367054516e17014CcdED1e7d814EDC9ce4; //baoUSDAddress
 aura=0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF;
 vault=0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-baseRewardPool=0xa0E1D9619979f06Ff375251AfE90de2801B009d8;
+baseRewardPool=0x158e9aeE324B97b32DA71178D4761C6B18baE02a; //BaoUSDLUSDAuraDepositVault
 booster=0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
-chair=0x8F97cCA30Dbe80e7a8B462F1dD1a51C32accDfC8;
-guardian=0xE3eD95e130ad9E15643f5A5f232a3daE980784cd;
-gov=0x926dF14a23BE491164dCF93f4c468A50ef659D5B;
+chair=0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00; //BaoDeployerMultisig
+guardian=0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00; //BaoDeployerMultisig
+gov=0x3dFc49e5112005179Da613BdE5973229082dAc35; //BaoTreasuryMultisig
 maxLossExpansion=10;
 maxLossWithdraw=10;
 maxLossTakeProfit=10;
-poolId=0x5b3240b6be3e7487d61cd1afdfc7fe4fa1d81e6400000000000000000000037b;
+poolId=0x7e9afd25f5ec0eb24d7d4b089ae7ecb9651c8b1f000000000000000000000511;
 forge create --rpc-url $1 \
     --constructor-args $dola $aura $vault $baseRewardPool $booster $chair $gov $maxLossExpansion $maxLossWithdraw $maxLossTakeProfit $poolId\
     --private-key $3 src/aura-fed/AuraFed.sol:AuraFed \
