@@ -99,7 +99,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
 
     function setMaxLossWithdrawBps(uint newMaxLossWithdrawBps) public {
-        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV OR CHAIR");
+        require(msg.sender == gov || msg.sender == guardian, "ONLY GOV OR GUARDIAN");
         if(msg.sender == guardian){
             //We limit the max loss a guardian, as we only want governance to be able to set a very high maxloss 
             require(newMaxLossWithdrawBps <= maxLossSetableByGuardian, "Above allowed maxloss for chair");

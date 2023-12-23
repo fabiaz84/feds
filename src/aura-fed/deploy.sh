@@ -1,4 +1,4 @@
-dola=0x865377367054516e17014CcdED1e7d814EDC9ce4; //baoUSDAddress
+dola=0x7945b0A6674b175695e5d1D08aE1e6F13744Abb0; //baoUSDAddress
 aura=0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF;
 vault=0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 baseRewardPool=0x158e9aeE324B97b32DA71178D4761C6B18baE02a; //BaoUSDLUSDAuraDepositVault
@@ -9,7 +9,7 @@ gov=0x3dFc49e5112005179Da613BdE5973229082dAc35; //BaoTreasuryMultisig
 maxLossExpansion=10;
 maxLossWithdraw=10;
 maxLossTakeProfit=10;
-poolId=0x7e9afd25f5ec0eb24d7d4b089ae7ecb9651c8b1f000000000000000000000511;
+poolId=0x7e9afd25f5ec0eb24d7d4b089ae7ecb9651c8b1f000000000000000000000511; //BalancerBPTAddress
 forge create --rpc-url $1 \
     --constructor-args $dola $aura $vault $baseRewardPool $booster $chair $gov $maxLossExpansion $maxLossWithdraw $maxLossTakeProfit $poolId\
     --private-key $3 src/aura-fed/AuraFed.sol:AuraFed \

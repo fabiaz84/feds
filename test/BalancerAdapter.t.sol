@@ -19,14 +19,14 @@ contract Swapper is BalancerComposableStablepoolAdapter {
 
 contract BalancerTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
-    IMintable dola = IMintable(0x865377367054516e17014CcdED1e7d814EDC9ce4);
-    address bbausd = 0xA13a9247ea42D743238089903570127DdA72fE44;
-    IERC20 bpt = IERC20(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
+    IMintable dola = IMintable(0x7945b0A6674b175695e5d1D08aE1e6F13744Abb0);
+    address bbausd = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+    IERC20 bpt = IERC20(0x7E9AfD25F5Ec0eb24d7d4b089Ae7EcB9651c8b1F);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address minter = address(0xB);
-    address gov = address(0x926dF14a23BE491164dCF93f4c468A50ef659D5B);
-    bytes32 poolId = bytes32(0x5b3240b6be3e7487d61cd1afdfc7fe4fa1d81e6400000000000000000000037b);
-    address holder = 0x4D2F01D281Dd0b98e75Ca3E1FdD36823B16a7dbf;
+    address gov = address(0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00);
+    bytes32 poolId = bytes32(0x7e9afd25f5ec0eb24d7d4b089ae7ecb9651c8b1f000000000000000000000511);
+    address holder = 0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00;
     Swapper swapper;
 
     function setUp() public {
@@ -55,8 +55,8 @@ contract BalancerTest is DSTest{
     function testManipulate_getRate_when_TradingTokens() public {
        uint bptNeededBefore = swapper.bptNeededForDola(1 ether); 
        vm.prank(minter);
-       dola.mint(address(swapper), 1000_000_000 ether);
-       swapper.swapExact(address(dola), address(bbausd), 10_000_000 ether);
+       dola.mint(address(swapper), 1000_000 ether);
+       swapper.swapExact(address(dola), address(bbausd), 10_000 ether);
        uint bptNeededAfter = swapper.bptNeededForDola(1 ether);
        assertGt(bptNeededBefore * 10000 / 9990, bptNeededAfter);
        assertLt(bptNeededBefore * 9990 / 10000, bptNeededAfter);

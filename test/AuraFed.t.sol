@@ -21,22 +21,22 @@ contract Swapper is BalancerComposableStablepoolAdapter {
 
 contract AuraFedTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
-    IMintable dola = IMintable(0x865377367054516e17014CcdED1e7d814EDC9ce4);
-    IERC20 bpt = IERC20(0x5b3240B6BE3E7487d61cd1AFdFC7Fe4Fa1D81e64);
+    IMintable dola = IMintable(0x7945b0A6674b175695e5d1D08aE1e6F13744Abb0);
+    IERC20 bpt = IERC20(0x7E9AfD25F5Ec0eb24d7d4b089Ae7EcB9651c8b1F);
     IERC20 bal = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
     IERC20 aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0x99653d46D52eE41c7b35cbAd1aC408A00bad6A76);
-    address booster = 0x7818A1DA7BD1E64c199029E86Ba244a9798eEE10;
+    IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0x158e9aeE324B97b32DA71178D4761C6B18baE02a);
+    address booster = 0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
     address chair = address(0xA);
     address guardian = address(0xB);
     address minter = address(0xB);
-    address gov = address(0x926dF14a23BE491164dCF93f4c468A50ef659D5B);
+    address gov = address(0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00);
     uint maxLossExpansion = 20;
     uint maxLossWithdraw = 20;
     uint maxLossTakeProfit = 20;
-    bytes32 poolId = bytes32(0x5b3240b6be3e7487d61cd1afdfc7fe4fa1d81e6400000000000000000000037b);
-    address holder = 0x4D2F01D281Dd0b98e75Ca3E1FdD36823B16a7dbf;
+    bytes32 poolId = bytes32(0x7e9afd25f5ec0eb24d7d4b089ae7ecb9651c8b1f000000000000000000000511);
+    address holder = 0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00;
     AuraFed fed;
     Swapper swapper;
 
@@ -297,7 +297,7 @@ contract AuraFedTest is DSTest{
     function testSetMaxLossWithdrawBps_fail_whenCalledByGov() public {
         uint initial = fed.maxLossWithdrawBps();
         
-        vm.expectRevert("ONLY GOV");
+        vm.expectRevert("ONLY GOV OR GUARDIAN");
         fed.setMaxLossWithdrawBps(1);
 
         assertEq(fed.maxLossWithdrawBps(), initial);
