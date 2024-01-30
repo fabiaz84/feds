@@ -21,7 +21,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     address public guardian;
     address public gov;
     uint public dolaSupply;
-    uint public constant pid = 93; //Gauge pid, should never change
+    uint public constant pid = 132; //Gauge pid, should never change
     uint public maxLossExpansionBps;
     uint public maxLossWithdrawBps;
     uint public maxLossTakeProfitBps;
