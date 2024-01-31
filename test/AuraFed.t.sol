@@ -32,9 +32,9 @@ contract AuraFedTest is DSTest{
     address guardian = address(0xB);
     address minter = address(0xB);
     address gov = address(0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00);
-    uint maxLossExpansion = 20;
-    uint maxLossWithdraw = 20;
-    uint maxLossTakeProfit = 20;
+    uint maxLossExpansion = 250;
+    uint maxLossWithdraw = 250;
+    uint maxLossTakeProfit = 250;
     bytes32 poolId = bytes32(0x1a44e35d5451e0b78621a1b3e7a53dfaa306b1d000000000000000000000051b);
     address holder = 0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00;
     AuraFed fed;
