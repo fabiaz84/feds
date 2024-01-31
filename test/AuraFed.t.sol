@@ -22,11 +22,11 @@ contract Swapper is BalancerComposableStablepoolAdapter {
 contract AuraFedTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
     IMintable dola = IMintable(0xf4edfad26EE0D23B69CA93112eccE52704E0006f);
-    IERC20 bpt = IERC20(0x1a44e35d5451e0b78621a1b3e7a53dfaa306b1d0);
+    IERC20 bpt = IERC20(0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0);
     IERC20 bal = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
     IERC20 aura = IERC20(0xC0c293ce456fF0ED870ADd98a0828Dd4d2903DBF);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0xc8fc8ac325d941c31655c62169dd47778129be63);
+    IAuraBalRewardPool baseRewardPool = IAuraBalRewardPool(0xc8FC8aC325d941C31655C62169DD47778129BE63);
     address booster = 0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
     address chair = address(0xA);
     address guardian = address(0xB);

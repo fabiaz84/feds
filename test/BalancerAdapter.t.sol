@@ -21,7 +21,7 @@ contract BalancerTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
     IMintable dola = IMintable(0xf4edfad26EE0D23B69CA93112eccE52704E0006f);
     address bbausd = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    IERC20 bpt = IERC20(0x1a44e35d5451e0b78621a1b3e7a53dfaa306b1d0);
+    IERC20 bpt = IERC20(0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address minter = address(0xB);
     address gov = address(0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00);
