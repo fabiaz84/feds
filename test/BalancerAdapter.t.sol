@@ -19,13 +19,13 @@ contract Swapper is BalancerComposableStablepoolAdapter {
 
 contract BalancerTest is DSTest{
     Vm internal constant vm = Vm(HEVM_ADDRESS);
-    IMintable dola = IMintable(0x7945b0A6674b175695e5d1D08aE1e6F13744Abb0);
-    address bbausd = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
-    IERC20 bpt = IERC20(0x7E9AfD25F5Ec0eb24d7d4b089Ae7EcB9651c8b1F);
+    IMintable dola = IMintable(0xf4edfad26EE0D23B69CA93112eccE52704E0006f);
+    address bbausd = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    IERC20 bpt = IERC20(0x1a44e35d5451e0b78621a1b3e7a53dfaa306b1d0);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address minter = address(0xB);
     address gov = address(0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00);
-    bytes32 poolId = bytes32(0x7e9afd25f5ec0eb24d7d4b089ae7ecb9651c8b1f000000000000000000000511);
+    bytes32 poolId = bytes32(0x1a44e35d5451e0b78621a1b3e7a53dfaa306b1d000000000000000000000051b);
     address holder = 0xFC69e0a5823E2AfCBEb8a35d33588360F1496a00;
     Swapper swapper;
 
