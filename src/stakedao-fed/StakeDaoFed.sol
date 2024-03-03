@@ -2,21 +2,19 @@ pragma solidity ^0.8.13;
 
 import "src/interfaces/IERC20.sol";
 import "src/interfaces/balancer/IVault.sol";
-import "src/interfaces/aura/IAuraLocker.sol";
-import "src/interfaces/aura/IAuraBalRewardPool.sol";
-import "src/aura-fed/BalancerAdapter.sol";
+import "src/interfaces/stakedao/IBalancerVault.sol";
+import "src/interfaces/stakedao/IGauge.sol";
+import "src/interfaces/stakedao/IClaimRewards.sol";
+import "src/stakedao-fed/BalancerAdapter.sol";
 
-interface IAuraBooster {
-    function depositAll(uint _pid, bool _stake) external;
-    function withdraw(uint _pid, uint _amount) external;
-}
+contract StakeDaoFed is BalancerComposableStablepoolAdapter{
 
-contract AuraFed is BalancerComposableStablepoolAdapter{
-
-    IAuraBalRewardPool public dolaBptRewardPool;
-    IAuraBooster public booster;
+    IBalancerVault public balancerVault;
+    IGauge public baoGauge;
+    IClaimRewards public rewards;
     IERC20 public bal;
-    IERC20 public aura;
+    IERC20 public std;
+    address public baousdGauge;
     address public chair; // Fed Chair
     address public guardian;
     address public gov;
@@ -32,11 +30,13 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
 
     struct InitialAddresses {
         address dola;
-        address aura;
+        address bal;
+        address std;
         address vault;
-        address dolaBptRewardPool;
         address bpt;
-        address booster;
+        address balancerVault;
+        address baoGauge;
+        address rewards;
         address chair;
         address guardian;
         address gov;
@@ -53,12 +53,14 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         require(maxLossExpansionBps_ < 10000, "Expansion max loss too high");
         require(maxLossWithdrawBps_ < 10000, "Withdraw max loss too high");
         require(maxLossTakeProfitBps_ < 10000, "TakeProfit max loss too high");
-        dolaBptRewardPool = IAuraBalRewardPool(addresses_.dolaBptRewardPool);
-        booster = IAuraBooster(addresses_.booster);
-        aura = IERC20(addresses_.aura);
-        bal = IERC20(address(IAuraBalRewardPool(addresses_.dolaBptRewardPool).rewardToken()));
+        balancerVault = IBalancerVault(addresses_.balancerVault);
+        baoGauge = IGauge(addresses_.baoGauge);
+        baousdGauge = 0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0;
+        rewards = IClaimRewards(addresses_.rewards);
+        std = IERC20(addresses_.std);
+        bal = IERC20(addresses_.bal);
         (address bpt,) = IVault(addresses_.vault).getPool(poolId_);
-        IERC20(bpt).approve(addresses_.booster, type(uint256).max);
+        IERC20(bpt).approve(addresses_.balancerVault, type(uint256).max);
         maxLossExpansionBps = maxLossExpansionBps_;
         maxLossWithdrawBps = maxLossWithdrawBps_;
         maxLossTakeProfitBps = maxLossTakeProfitBps_;
@@ -85,7 +87,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
 
     /**
-    @notice Method for current chair of the Aura FED to resign
+    @notice Method for current chair of the STAKEDAO FED to resign
     */
     function resign() public {
         require(msg.sender == chair, "ONLY CHAIR");
@@ -120,7 +122,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         maxLossSetableByGuardian = newMaxLossSetableByGuardian;
     }
     /**
-    @notice Deposits amount of dola tokens into balancer, before locking with aura
+    @notice Deposits amount of dola tokens into balancer, before locking with stakedao
     @param amount Amount of dola token to deposit
     */
     function expansion(uint amount) public {
@@ -128,7 +130,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         dolaSupply += amount;
         IERC20(dola).mint(address(this), amount);
         _deposit(amount, maxLossExpansionBps);
-        booster.depositAll(pid, true);
+        balancerVault.deposit(address(this), dola.balanceOf(address(this)), true);
         emit Expansion(amount);
     }
     /**
@@ -149,9 +151,8 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
         uint bptNeeded = bptNeededForDola(amountDola);
         require(bptNeeded <= bptSupply(), "Not enough BPT tokens");
 
-        //Withdraw BPT tokens from aura, but don't claim rewards
-        require(dolaBptRewardPool.withdrawAndUnwrap(bptNeeded, false), "AURA WITHDRAW FAILED");
-
+        //Withdraw BPT tokens from stakedao, but don't claim rewards
+        balancerVault.withdraw(bptNeeded);
 
         //Withdraw DOLA from balancer pool
         uint dolaWithdrawn = _withdraw(amountDola, maxLossWithdrawBps);
@@ -166,8 +167,7 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     */
     function contractAll() public {
         require(msg.sender == chair, "ONLY CHAIR");
-        //dolaBptRewardPool.withdrawAllAndUnwrap(false);
-        require(dolaBptRewardPool.withdrawAndUnwrap(dolaBptRewardPool.balanceOf(address(this)), false), "AURA WITHDRAW FAILED");
+        balancerVault.withdraw(baoGauge.balanceOf(address(this)));
         uint dolaWithdrawn = _withdrawAll(maxLossWithdrawBps);
         require(dolaWithdrawn > 0, "Must contract");
         _burnAndPay();
@@ -190,30 +190,32 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
 
     /**
-    @notice Withdraws the profit generated by aura staking
+    @notice Withdraws the profit generated by stakedao staking
     @dev See dev note on Contraction method
     */
     function takeProfit(bool harvestLP) public {
         //This takes balLP at face value, but doesn't take into account slippage or fees
         //Worth considering that the additional transaction fees incurred by withdrawing the small amount of profit generated by tx fees,
-        //may not eclipse additional transaction costs. Set harvestLP = false to only withdraw bal and aura rewards.
+        //may not eclipse additional transaction costs. Set harvestLP = false to only withdraw bal and stakedao rewards.
         uint bptValue = bptSupply() * bpt.getRate() / 10**18;
         if(harvestLP && bptValue > dolaSupply) {
             require(msg.sender == chair, "ONLY CHAIR CAN TAKE BPT PROFIT");
             uint dolaSurplus = bptValue - dolaSupply;
             uint bptToWithdraw = bptNeededForDola(dolaSurplus);
-            if(bptToWithdraw > dolaBptRewardPool.balanceOf(address(this))){
-                bptToWithdraw = dolaBptRewardPool.balanceOf(address(this));
+            if(bptToWithdraw > baoGauge.balanceOf(address(this))){
+                bptToWithdraw = baoGauge.balanceOf(address(this));
             }
-            require(dolaBptRewardPool.withdrawAndUnwrap(bptToWithdraw, false), "AURA WITHDRAW FAILED");
+            balancerVault.withdraw(bptToWithdraw);
             uint dolaProfit = _withdraw(dolaSurplus, maxLossTakeProfitBps);
             require(dolaProfit > 0, "NO PROFIT");
             dola.transfer(gov, dolaProfit);
         }
 
-        require(dolaBptRewardPool.getReward(address(this), true), "Getting reward failed");
+        address[] memory baoGaugeArray = new address[](1);
+        baoGaugeArray[0] = baousdGauge;
+        rewards.claimRewards(baoGaugeArray);
         bal.transfer(gov, bal.balanceOf(address(this)));
-        aura.transfer(gov, aura.balanceOf(address(this)));
+        std.transfer(gov, std.balanceOf(address(this)));
     }
 
     /**
@@ -226,9 +228,9 @@ contract AuraFed is BalancerComposableStablepoolAdapter{
     }
     
     /**
-    @notice View function for getting bpt tokens in the contract + aura dolaBptRewardPool
+    @notice View function for getting bpt tokens in the contract + stakedao baogauge 
     */
     function bptSupply() public view returns(uint){
-        return IERC20(bpt).balanceOf(address(this)) + dolaBptRewardPool.balanceOf(address(this));
+        return IERC20(bpt).balanceOf(address(this)) + baoGauge.balanceOf(address(this));
     }
 }
