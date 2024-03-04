@@ -29,6 +29,8 @@ contract StakeDaoFedTest is DSTest{
     IERC20 std = IERC20(0x73968b9a57c6E53d41345FD57a6E6ae27d6CDB2F);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
     address baoGauge = 0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0;
+    address baousdGauge = 0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0;
+    address sdbaousdGauge = 0xC6A0B204E28C05838b8B1C36f61963F16eCD64C4;
     address balancerVault = 0xd9663A5e08f0B3db295C5346C1B52677B7398585;
     address rewards = 0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
     address chair = address(0xA);
@@ -53,6 +55,7 @@ contract StakeDaoFedTest is DSTest{
             address(bpt),
             balancerVault,
             baoGauge,
+            sdbaousdGauge,
             rewards,
             chair,
             guardian,
@@ -105,6 +108,28 @@ contract StakeDaoFedTest is DSTest{
 
         fed.burnRemainingDolaSupply();
         assertEq(fed.dolaSupply(), 0);
+    }
+
+    function testContraction_succeed_whenContractedWithinAcceptableSlippage() public {
+        uint amount = 1 ether;
+        vm.prank(chair);
+        fed.expansion(amount*2);
+        uint initialDolaSupply = fed.dolaSupply();
+        uint initialDolaTotalSupply = dola.totalSupply();
+        uint initialBalLpSupply = fed.bptSupply();
+
+        vm.prank(chair);
+        fed.contraction(amount);
+
+        //Make sure basic accounting of contraction is correct:
+        assertGt(initialBalLpSupply, fed.bptSupply());
+        assertGt(initialDolaSupply, fed.dolaSupply());
+        assertGt(initialDolaTotalSupply, dola.totalSupply());
+        assertEq(initialDolaTotalSupply - dola.totalSupply(), initialDolaSupply - fed.dolaSupply());
+
+        //Make sure maxLoss wasn't exceeded
+        assertLe(initialDolaSupply-fed.dolaSupply(), amount*10_000/(10_000-maxLossWithdraw), "Amount withdrawn exceeds maxloss"); 
+        assertLe(initialDolaTotalSupply-dola.totalSupply(), amount*10_000/(10_000-maxLossWithdraw), "Amount withdrawn exceeds maxloss");
     }
 
     function testContraction_FailWithOnlyChair_whenCalledByOtherAddress() public {

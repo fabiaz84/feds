@@ -11,11 +11,12 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
 
     IBalancerVault public balancerVault;
     IGauge public baoGauge;
+    IGauge public sdbaousdGauge;
     IClaimRewards public rewards;
     IERC20 public bal;
     IERC20 public std;
     address public baousdGauge;
-    address public chair; // Fed Chair
+    address public chair;
     address public guardian;
     address public gov;
     uint public dolaSupply;
@@ -36,6 +37,7 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         address bpt;
         address balancerVault;
         address baoGauge;
+        address sdbaousdGauge;
         address rewards;
         address chair;
         address guardian;
@@ -56,6 +58,7 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         balancerVault = IBalancerVault(addresses_.balancerVault);
         baoGauge = IGauge(addresses_.baoGauge);
         baousdGauge = 0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0;
+        sdbaousdGauge = IGauge(addresses_.sdbaousdGauge);
         rewards = IClaimRewards(addresses_.rewards);
         std = IERC20(addresses_.std);
         bal = IERC20(addresses_.bal);
@@ -130,7 +133,7 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         dolaSupply += amount;
         IERC20(dola).mint(address(this), amount);
         _deposit(amount, maxLossExpansionBps);
-        balancerVault.deposit(address(this), dola.balanceOf(address(this)), true);
+        balancerVault.deposit(address(this), bpt.balanceOf(address(this)), true);
         emit Expansion(amount);
     }
     /**
@@ -228,9 +231,19 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
     }
     
     /**
-    @notice View function for getting bpt tokens in the contract + stakedao baogauge 
+    @notice View function for getting bpt tokens in the contract + stakedao baousdgauge 
     */
     function bptSupply() public view returns(uint){
-        return IERC20(bpt).balanceOf(address(this)) + baoGauge.balanceOf(address(this));
+        return IERC20(bpt).balanceOf(address(this)) + sdbaousdGauge.balanceOf(address(this));
+    }
+
+    function recoverERC20(address tokenAddress, uint256 amount) public {
+        require(msg.sender == gov, "ONLY GOV CAN RESCUE TOKENS");
+        IERC20 token = IERC20(tokenAddress);
+        uint256 contractBalance = token.balanceOf(address(this));
+        require(contractBalance >= amount, "Contract balance is insufficient");
+
+        bool success = token.transfer(gov, amount);
+        require(success, "Token transfer failed");
     }
 }

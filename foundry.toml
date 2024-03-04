@@ -5,7 +5,7 @@ libs = ['lib']
 solc_version =  '0.8.13'
 evm_version = "paris"
 gas_limit = 9223372036854775807
-verbosity = 3
+verbosity = 4
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
