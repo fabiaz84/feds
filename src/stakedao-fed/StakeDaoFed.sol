@@ -15,7 +15,6 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
     IClaimRewards public rewards;
     IERC20 public bal;
     IERC20 public std;
-    address public baousdGauge;
     address public chair;
     address public guardian;
     address public gov;
@@ -57,7 +56,6 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         require(maxLossTakeProfitBps_ < 10000, "TakeProfit max loss too high");
         balancerVault = IBalancerVault(addresses_.balancerVault);
         baoGauge = IGauge(addresses_.baoGauge);
-        baousdGauge = 0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0;
         sdbaousdGauge = IGauge(addresses_.sdbaousdGauge);
         rewards = IClaimRewards(addresses_.rewards);
         std = IERC20(addresses_.std);
@@ -215,7 +213,7 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         }
 
         address[] memory baoGaugeArray = new address[](1);
-        baoGaugeArray[0] = baousdGauge;
+        baoGaugeArray[0] = address(baoGauge);
         rewards.claimRewards(baoGaugeArray);
         bal.transfer(gov, bal.balanceOf(address(this)));
         std.transfer(gov, std.balanceOf(address(this)));
