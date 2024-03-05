@@ -138,6 +138,7 @@ contract StakeDaoFedTest is DSTest{
         uint initialGovDola = dola.balanceOf(gov);
         //Pass time
         washTrade(100, 10_000 ether);
+        vm.warp(block.timestamp + 1);
         vm.startPrank(chair);
         fed.takeProfit(false);
         vm.stopPrank();
