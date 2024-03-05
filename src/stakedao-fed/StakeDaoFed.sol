@@ -10,7 +10,6 @@ import "src/stakedao-fed/BalancerAdapter.sol";
 contract StakeDaoFed is BalancerComposableStablepoolAdapter{
 
     IBalancerVault public balancerVault;
-    IGauge public baoGauge;
     IGauge public sdbaousdGauge;
     IClaimRewards public rewards;
     IERC20 public bal;
@@ -35,7 +34,6 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         address vault;
         address bpt;
         address balancerVault;
-        address baoGauge;
         address sdbaousdGauge;
         address rewards;
         address chair;
@@ -55,7 +53,6 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         require(maxLossWithdrawBps_ < 10000, "Withdraw max loss too high");
         require(maxLossTakeProfitBps_ < 10000, "TakeProfit max loss too high");
         balancerVault = IBalancerVault(addresses_.balancerVault);
-        baoGauge = IGauge(addresses_.baoGauge);
         sdbaousdGauge = IGauge(addresses_.sdbaousdGauge);
         rewards = IClaimRewards(addresses_.rewards);
         std = IERC20(addresses_.std);
@@ -168,7 +165,7 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
     */
     function contractAll() public {
         require(msg.sender == chair, "ONLY CHAIR");
-        balancerVault.withdraw(baoGauge.balanceOf(address(this)));
+        balancerVault.withdraw(sdbaousdGauge.balanceOf(address(this)));
         uint dolaWithdrawn = _withdrawAll(maxLossWithdrawBps);
         require(dolaWithdrawn > 0, "Must contract");
         _burnAndPay();
@@ -203,8 +200,8 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
             require(msg.sender == chair, "ONLY CHAIR CAN TAKE BPT PROFIT");
             uint dolaSurplus = bptValue - dolaSupply;
             uint bptToWithdraw = bptNeededForDola(dolaSurplus);
-            if(bptToWithdraw > baoGauge.balanceOf(address(this))){
-                bptToWithdraw = baoGauge.balanceOf(address(this));
+            if(bptToWithdraw > sdbaousdGauge.balanceOf(address(this))){
+                bptToWithdraw = sdbaousdGauge.balanceOf(address(this));
             }
             balancerVault.withdraw(bptToWithdraw);
             uint dolaProfit = _withdraw(dolaSurplus, maxLossTakeProfitBps);
@@ -213,7 +210,7 @@ contract StakeDaoFed is BalancerComposableStablepoolAdapter{
         }
 
         address[] memory baoGaugeArray = new address[](1);
-        baoGaugeArray[0] = address(baoGauge);
+        baoGaugeArray[0] = address(sdbaousdGauge);
         rewards.claimRewards(baoGaugeArray);
         bal.transfer(gov, bal.balanceOf(address(this)));
         std.transfer(gov, std.balanceOf(address(this)));

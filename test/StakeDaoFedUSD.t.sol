@@ -28,10 +28,9 @@ contract StakeDaoFedTest is DSTest{
     IERC20 bal = IERC20(0xba100000625a3754423978a60c9317c58a424e3D);
     IERC20 std = IERC20(0x73968b9a57c6E53d41345FD57a6E6ae27d6CDB2F);
     address vault = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-    address baoGauge = 0x1A44E35d5451E0b78621A1B3e7a53DFaA306B1D0;
     address sdbaousdGauge = 0xC6A0B204E28C05838b8B1C36f61963F16eCD64C4;
     address balancerVault = 0xd9663A5e08f0B3db295C5346C1B52677B7398585;
-    address rewards = 0xA57b8d98dAE62B26Ec3bcC4a365338157060B234;
+    address rewards = 0x633120100e108F03aCe79d6C78Aac9a56db1be0F;
     address chair = address(0xA);
     address guardian = address(0xB);
     address minter = address(0xB);
@@ -53,7 +52,6 @@ contract StakeDaoFedTest is DSTest{
             vault, 
             address(bpt),
             balancerVault,
-            baoGauge,
             sdbaousdGauge,
             rewards,
             chair,
@@ -129,6 +127,25 @@ contract StakeDaoFedTest is DSTest{
         //Make sure maxLoss wasn't exceeded
         assertLe(initialDolaSupply-fed.dolaSupply(), amount*10_000/(10_000-maxLossWithdraw), "Amount withdrawn exceeds maxloss"); 
         assertLe(initialDolaTotalSupply-dola.totalSupply(), amount*10_000/(10_000-maxLossWithdraw), "Amount withdrawn exceeds maxloss");
+    }
+
+    function testTakeProfit_IncreaseGovBalAuraBalance_whenCallingWithoutHarvestLpFlag() public {
+        vm.startPrank(chair);
+        fed.expansion(1000 ether);
+        uint initialAura = std.balanceOf(gov);
+        uint initialAuraBal = bal.balanceOf(gov);
+        uint initialBalLpSupply = fed.bptSupply();
+        uint initialGovDola = dola.balanceOf(gov);
+        //Pass time
+        washTrade(100, 10_000 ether);
+        vm.startPrank(chair);
+        fed.takeProfit(false);
+        vm.stopPrank();
+
+        assertGt(std.balanceOf(gov), initialAura, "treasury std balance didn't increase");
+        assertGt(bal.balanceOf(gov), initialAuraBal, "treasury bal balance din't increase");
+        assertEq(initialBalLpSupply, fed.bptSupply(), "bpt supply changed");
+        assertEq(dola.balanceOf(gov), initialGovDola, "Gov DOLA supply changed");
     }
 
     function testContraction_FailWithOnlyChair_whenCalledByOtherAddress() public {
